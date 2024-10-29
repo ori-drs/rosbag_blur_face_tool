@@ -93,24 +93,16 @@ other_topics_action = Action.FILTER
 # process camera topics
 
 # get the three lists of messages
-cam0_connection = None
-cam1_connection = None
-cam2_connection = None
 cam0_msg_list = []
 cam1_msg_list = []
 cam2_msg_list = []
-
 for connection in reader.connections:
     if connection.topic == camera_topics[0]:
         cam0_msg_list = list(reader.messages(connections=[connection]))
-        cam0_connection = connection
     elif connection.topic == camera_topics[1]:
         cam1_msg_list = list(reader.messages(connections=[connection]))
-        cam1_connection = connection
     elif connection.topic == camera_topics[2]:
         cam2_msg_list = list(reader.messages(connections=[connection]))
-        cam2_connection = connection
-
 
 # display windows
 cv2.namedWindow('cam1', cv2.WINDOW_NORMAL)
@@ -123,7 +115,8 @@ cv2.resizeWindow('cam1', 640, 480)
 cv2.resizeWindow('cam0', 640, 480)
 cv2.resizeWindow('cam2', 640, 480)
 
-current_frame = 0          
+# program loop
+current_frame = 0
 while True:
         
     # get first msg
