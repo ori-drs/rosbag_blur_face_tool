@@ -17,6 +17,20 @@ class Action(Enum):
     PASSTHROUGH = 1
     FILTER = 2
 
+class BlurRegion:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+
+    def contains(self, x, y):
+        return self.x <= x <= self.x + self.width and self.y <= y <= self.y + self.height
+    
+    def draw_border(self, image, color, thickness):
+        cv2.rectangle(image, (self.x, self.y), (self.x + self.width, self.y + self.height), color, thickness)
+
+
 class Application:
 
     def __init__(self):
@@ -61,6 +75,16 @@ class Application:
         self.cam1_display_image = None
         self.cam2_display_image = None
 
+        self.cam0_msg_list = []
+        self.cam1_msg_list = []
+        self.cam2_msg_list = []
+
+        self.cam0_blur_regions = []
+        self.cam1_blur_regions = []
+        self.cam2_blur_regions = []
+
+
+
 
 
         # # process passthrough topics and other topics
@@ -69,9 +93,10 @@ class Application:
 
         # process camera topics
         self.initialize_window()
-        self.load_images()
-        self.load_new_image()
-        self.update_display_image()
+        self.load_images_from_bag()
+        self.initialize_blur_regions()
+        self.read_images_at_current_frame()
+        self.generate_display_image()
         self.update_window()
 
 
@@ -101,18 +126,22 @@ class Application:
         self.writer.close()
 
 
-    def load_images(self):
+    def load_images_from_bag(self):
         # get the three lists of messages
-        self.cam0_msg_list = []
-        self.cam1_msg_list = []
-        self.cam2_msg_list = []
         for connection in self.reader.connections:
             if connection.topic == self.camera_topics[0]:
                 self.cam0_msg_list = list(self.reader.messages(connections=[connection]))
             elif connection.topic == self.camera_topics[1]:
                 self.cam1_msg_list = list(self.reader.messages(connections=[connection]))
+                self.cam1_blur_regions = [[] for _ in range(len(self.cam1_msg_list))]
             elif connection.topic == self.camera_topics[2]:
                 self.cam2_msg_list = list(self.reader.messages(connections=[connection]))
+                self.cam2_blur_regions = [[] for _ in range(len(self.cam2_msg_list))]
+
+    def initialize_blur_regions(self):
+        self.cam0_blur_regions = [[] for _ in range(len(self.cam0_msg_list))]
+        self.cam1_blur_regions = [[] for _ in range(len(self.cam1_msg_list))]
+        self.cam2_blur_regions = [[] for _ in range(len(self.cam2_msg_list))]
 
     def process_passthrough_and_other_topics(self):
         # process passthrough topics and other topics
@@ -138,6 +167,10 @@ class Application:
     def cam0_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_MOUSEMOVE:
             self.cam0_mouse_x, self.cam0_mouse_y = x, y
+        
+        if event == cv2.EVENT_LBUTTONDOWN:
+            blur_region = BlurRegion(x, y, 10, 10)
+            self.cam0_blur_regions[self.current_frame].append(blur_region)
     
     def cam1_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_MOUSEMOVE:
@@ -169,7 +202,7 @@ class Application:
         cv2.moveWindow('cam2', 1280, 0)
         
 
-    def load_new_image(self):
+    def read_images_at_current_frame(self):
         # get first msg
         cam0_connection, cam0_timestamp, cam0_rawdata = self.cam0_msg_list[self.current_frame]
         cam1_connection, cam1_timestamp, cam1_rawdata = self.cam1_msg_list[self.current_frame]
@@ -218,9 +251,18 @@ class Application:
             cv2.line(self.cam2_display_image, (self.cam2_mouse_x - line_length, self.cam2_mouse_y), (self.cam2_mouse_x + line_length, self.cam2_mouse_y), color, thickness)
             cv2.line(self.cam2_display_image, (self.cam2_mouse_x, self.cam2_mouse_y - line_length), (self.cam2_mouse_x, self.cam2_mouse_y + line_length), color, thickness)
 
-    def update_display_image(self):
+    def draw_blur_regions_border(self):
+        for region in self.cam0_blur_regions[self.current_frame]:
+            region.draw_border(self.cam0_display_image, (0, 0, 255), 2)
+        for region in self.cam1_blur_regions[self.current_frame]:
+            region.draw_border(self.cam1_display_image, (0, 0, 255), 2)
+        for region in self.cam2_blur_regions[self.current_frame]:
+            region.draw_border(self.cam2_display_image, (0, 0, 255), 2)
+
+    def generate_display_image(self):
         self.reset_display_image()
         self.draw_crosshair()
+        self.draw_blur_regions_border()
 
     # def write_images_to_bag(self):
     #     # modify the image to gray
@@ -238,7 +280,7 @@ class Application:
 
     def run(self):
         while True:
-            self.update_display_image()
+            self.generate_display_image()
             self.update_window()
 
             key = cv2.waitKey(1)
@@ -246,13 +288,13 @@ class Application:
                 break
             elif key == 81:  # Left arrow key
                 self.decrease_frame()
-                self.load_new_image()
-                self.update_display_image()
+                self.read_images_at_current_frame()
+                self.generate_display_image()
                 self.update_window()
             elif key == 83:  # Right arrow key
                 self.increase_frame()
-                self.load_new_image()
-                self.update_display_image()
+                self.read_images_at_current_frame()
+                self.generate_display_image()
                 self.update_window()
             else:
                 continue
