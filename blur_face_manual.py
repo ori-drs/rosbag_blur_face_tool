@@ -15,12 +15,12 @@ import numpy as np
 from cv_bridge import CvBridge
 
 
-
+# paths
 bagpath = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
 new_bagpath = Path('new.bag')
-
 # bagpath = Path('new.bag')
 # new_bagpath = Path('new2.bag')
+
 
 camera_topics = [
     '/alphasense_driver_ros/cam0/debayered/image/compressed',
@@ -29,17 +29,27 @@ camera_topics = [
     ]
 
 
-# Create a type store to use if the bag has no message definitions.
+# helper objects
 typestore = get_typestore(Stores.ROS1_NOETIC)
-
-
 reader = AnyReader([bagpath], default_typestore=typestore)
 writer = Writer(new_bagpath)
 reader.open()
 writer.open()
-
 bridge = CvBridge()
 
+def process_image(input_image):
+    return cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
+
+def image_to_compressed_msg(image, header):
+    _, compressed_image = cv2.imencode('.jpg', image)
+    return CompressedImage(
+        header=header,
+        format='jpg',
+        data=np.frombuffer(compressed_image, dtype=np.uint8),
+    )
+    
+
+# loop through all connections
 for connection in reader.connections:
 
     # skip if not in camera topics
@@ -47,7 +57,8 @@ for connection in reader.connections:
         continue
     
     # if is camera topics
-    new_connection = writer.add_connection(connection.topic, connection.msgtype, typestore=typestore)
+    message_type = connection.msgtype
+    
     input_msg_list = list(reader.messages(connections=[connection]))
 
     # get first msg
@@ -60,27 +71,19 @@ for connection in reader.connections:
 
     # Display the image
     cv2.imshow('Image', input_image)
-    cv2.waitKey(0)
+    # cv2.waitKey(0)
 
     # modify the image to gray
-    output_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
+    output_image = process_image(input_image)
     
-    
-    # # write the gray image to the new bag
-    # writer.write(connection, timestamp, typestore.serialize_ros1(modified_msg, connection.msgtype))
+    # compress image
+    output_msg = image_to_compressed_msg(output_image, input_msg.header)
 
-    _, compressed_image = cv2.imencode('.jpg', output_image)
-    output_msg = CompressedImage(
-        input_msg.header,
-        format='jpeg',
-        data=np.frombuffer(compressed_image, dtype=np.uint8),
-    )
-
-    writer.write(
-        new_connection,
-        timestamp,
-        typestore.serialize_ros1(output_msg, connection.msgtype),
-    )
+    # write to new bag
+    new_connection = writer.add_connection(connection.topic, message_type, msgdef=connection.msgdef, typestore=typestore)
+    new_rawdata = typestore.serialize_ros1(output_msg, message_type)
+    new_timestamp = timestamp
+    writer.write(new_connection, new_timestamp, new_rawdata)
     
     # current_frame = 0
     # while True:
