@@ -104,48 +104,101 @@ for connection in reader.connections:
     elif connection.topic == camera_topics[2]:
         cam2_msg_list = list(reader.messages(connections=[connection]))
 
-# display windows
-cv2.namedWindow('cam1', cv2.WINDOW_NORMAL)
-cv2.namedWindow('cam0', cv2.WINDOW_NORMAL)
-cv2.namedWindow('cam2', cv2.WINDOW_NORMAL)
-cv2.moveWindow('cam1', 0, 0)
-cv2.moveWindow('cam0', 640, 0)
-cv2.moveWindow('cam2', 1280, 0)
-cv2.resizeWindow('cam1', 640, 480)
-cv2.resizeWindow('cam0', 640, 480)
-cv2.resizeWindow('cam2', 640, 480)
 
-# program loop
-current_frame = 0
-while True:
-        
-    # get first msg
-    cam0_connection, cam0_timestamp, cam0_rawdata = cam0_msg_list[current_frame]
-    cam1_connection, cam1_timestamp, cam1_rawdata = cam1_msg_list[current_frame]
-    cam2_connection, cam2_timestamp, cam2_rawdata = cam2_msg_list[current_frame]
 
-    cam0_msg = reader.deserialize(cam0_rawdata, cam0_connection.msgtype)
-    cam1_msg = reader.deserialize(cam1_rawdata, cam1_connection.msgtype)
-    cam2_msg = reader.deserialize(cam2_rawdata, cam2_connection.msgtype)
+class Application:
 
-    cam0_image = bridge.compressed_imgmsg_to_cv2(cam0_msg, desired_encoding='passthrough')
-    cam1_image = bridge.compressed_imgmsg_to_cv2(cam1_msg, desired_encoding='passthrough')
-    cam2_image = bridge.compressed_imgmsg_to_cv2(cam2_msg, desired_encoding='passthrough')
+    def __init__(self):
+        self.current_frame = 0
+        self.mouse_x = -1
+        self.mouse_y = -1
+        self.cam0_image = None
+        self.cam1_image = None
+        self.cam2_image = None
 
-    # Display the image    
-    cv2.imshow('cam0', cam0_image)
-    cv2.imshow('cam1', cam1_image)
-    cv2.imshow('cam2', cam2_image)
+        self.initialize_window()
+        self.load_new_image()
+        self.update_window()
     
-    key = cv2.waitKey(0)
-    if key == ord('q'):
-        break
-    elif key == 81:  # Left arrow key
-        current_frame = max(0, current_frame - 1)
-    elif key == 83:  # Right arrow key
-        current_frame += 1
-    else:
-        continue
+    # Mouse event callback function to update mouse position
+    def mouse_callback(self, event, x, y, flags, param):
+        if event == cv2.EVENT_MOUSEMOVE:
+            self.mouse_x, self.mouse_y = x, y
+
+    def initialize_window(self):
+        # display windows
+        cv2.namedWindow('cam1', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('cam0', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('cam2', cv2.WINDOW_NORMAL)
+        cv2.moveWindow('cam1', 0, 0)
+        cv2.moveWindow('cam0', 640, 0)
+        cv2.moveWindow('cam2', 1280, 0)
+        cv2.resizeWindow('cam1', 640, 480)
+        cv2.resizeWindow('cam0', 640, 480)
+        cv2.resizeWindow('cam2', 640, 480)
+
+        cv2.setMouseCallback('cam1', self.mouse_callback)
+
+    def load_new_image(self):
+        # get first msg
+        cam0_connection, cam0_timestamp, cam0_rawdata = cam0_msg_list[self.current_frame]
+        cam1_connection, cam1_timestamp, cam1_rawdata = cam1_msg_list[self.current_frame]
+        cam2_connection, cam2_timestamp, cam2_rawdata = cam2_msg_list[self.current_frame]
+
+        cam0_msg = reader.deserialize(cam0_rawdata, cam0_connection.msgtype)
+        cam1_msg = reader.deserialize(cam1_rawdata, cam1_connection.msgtype)
+        cam2_msg = reader.deserialize(cam2_rawdata, cam2_connection.msgtype)
+
+        self.cam0_image = bridge.compressed_imgmsg_to_cv2(cam0_msg, desired_encoding='passthrough')
+        self.cam1_image = bridge.compressed_imgmsg_to_cv2(cam1_msg, desired_encoding='passthrough')
+        self.cam2_image = bridge.compressed_imgmsg_to_cv2(cam2_msg, desired_encoding='passthrough')
+
+    def update_window(self):
+        # Display the image    
+        cv2.imshow('cam0', self.cam0_image)
+        cv2.imshow('cam1', self.cam1_image)
+        cv2.imshow('cam2', self.cam2_image)
+
+    def increase_frame(self):
+        self.current_frame += 1
+
+    def decrease_frame(self):
+        self.current_frame = max(0, self.current_frame - 1)
+
+
+    def run(self):
+        while True:
+
+            # Overlay a crosshair at the mouse position
+            if self.mouse_x != -1 and self.mouse_y != -1:
+                # Draw horizontal and vertical lines to create the crosshair
+                line_length = 20
+                color = (0, 0, 255)  # Red color for the crosshair
+                thickness = 2
+
+                # Horizontal line
+                cv2.line(self.cam0_image, (self.mouse_x - line_length, self.mouse_y), (self.mouse_x + line_length, self.mouse_y), color, thickness)
+                # Vertical line
+                cv2.line(self.cam0_image, (self.mouse_x, self.mouse_y - line_length), (self.mouse_x, self.mouse_y + line_length), color, thickness)
+
+            key = cv2.waitKey(1)
+            if key == ord('q'):
+                break
+            elif key == 81:  # Left arrow key
+                self.decrease_frame()
+                self.load_new_image()
+                self.update_window()
+            elif key == 83:  # Right arrow key
+                self.increase_frame()
+                self.load_new_image()
+                self.update_window()
+            else:
+                continue
+
+        cv2.destroyAllWindows()
+        reader.close()
+        # writer.close()
+
 
     # # modify the image to gray
     # output_image = process_image(input_image)
@@ -213,6 +266,5 @@ while True:
 #     continue
 
 
-# reader.close()
-# writer.close()
-
+app = Application()
+app.run()
