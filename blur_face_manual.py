@@ -18,17 +18,17 @@ class Action(Enum):
     FILTER = 2
 
 class BlurRegion:
-    def __init__(self, x, y, width, height):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
+    def __init__(self, start_x, start_y, end_x, end_y):
+        self.start_x = start_x
+        self.start_y = start_y
+        self.end_x = end_x
+        self.end_y = end_y
 
     def contains(self, x, y):
-        return self.x <= x <= self.x + self.width and self.y <= y <= self.y + self.height
+        return self.start_x <= x <= self.end_x and self.start_y <= y <= self.end_y
     
     def draw_border(self, image, color, thickness):
-        cv2.rectangle(image, (self.x, self.y), (self.x + self.width, self.y + self.height), color, thickness)
+        cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
 
 
 class Application:
@@ -165,20 +165,82 @@ class Application:
     
     # Mouse event callback function to update mouse position
     def cam0_mouse_callback(self, event, x, y, flags, param):
-        if event == cv2.EVENT_MOUSEMOVE:
-            self.cam0_mouse_x, self.cam0_mouse_y = x, y
-        
         if event == cv2.EVENT_LBUTTONDOWN:
-            blur_region = BlurRegion(x, y, 10, 10)
+            # dragging
+            dragging = True
+            self.cam0_drag_start_x = x
+            self.cam0_drag_start_y = y
+
+        elif event == cv2.EVENT_MOUSEMOVE:
+            # dragging
+            if dragging:
+                self.cam0_drag_end_x = x
+                self.cam0_drag_end_y = y
+
+            # position
+            self.cam0_mouse_x, self.cam0_mouse_y = x, y
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            # dragging
+            dragging = False
+            self.cam0_drag_end_x = x
+            self.cam0_drag_end_y = y
+
+            # add blur region
+            blur_region = BlurRegion(self.cam0_drag_start_x, self.cam0_drag_start_y, self.cam0_drag_end_x, self.cam0_drag_end_y)
             self.cam0_blur_regions[self.current_frame].append(blur_region)
     
     def cam1_mouse_callback(self, event, x, y, flags, param):
-        if event == cv2.EVENT_MOUSEMOVE:
+        if event == cv2.EVENT_LBUTTONDOWN:
+            # dragging
+            dragging = True
+            self.cam1_drag_start_x = x
+            self.cam1_drag_start_y = y
+
+        elif event == cv2.EVENT_MOUSEMOVE:
+            # dragging
+            if dragging:
+                self.cam1_drag_end_x = x
+                self.cam1_drag_end_y = y
+
+            # position
             self.cam1_mouse_x, self.cam1_mouse_y = x, y
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            # dragging
+            dragging = False
+            self.cam1_drag_end_x = x
+            self.cam1_drag_end_y = y
+
+            # add blur region
+            blur_region = BlurRegion(self.cam1_drag_start_x, self.cam1_drag_start_y, self.cam1_drag_end_x, self.cam1_drag_end_y)
+            self.cam1_blur_regions[self.current_frame].append(blur_region)
         
     def cam2_mouse_callback(self, event, x, y, flags, param):
-        if event == cv2.EVENT_MOUSEMOVE:
+        if event == cv2.EVENT_LBUTTONDOWN:
+            # dragging
+            dragging = True
+            self.cam2_drag_start_x = x
+            self.cam2_drag_start_y = y
+
+        elif event == cv2.EVENT_MOUSEMOVE:
+            # dragging
+            if dragging:
+                self.cam2_drag_end_x = x
+                self.cam2_drag_end_y = y
+
+            # position
             self.cam2_mouse_x, self.cam2_mouse_y = x, y
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            # dragging
+            dragging = False
+            self.cam2_drag_end_x = x
+            self.cam2_drag_end_y = y
+
+            # add blur region
+            blur_region = BlurRegion(self.cam2_drag_start_x, self.cam2_drag_start_y, self.cam2_drag_end_x, self.cam2_drag_end_y)
+            self.cam2_blur_regions[self.current_frame].append(blur_region)
 
     def initialize_window(self):
         # display windows
