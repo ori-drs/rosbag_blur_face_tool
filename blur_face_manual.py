@@ -83,8 +83,9 @@ class Application:
         self.cam1_blur_regions = []
         self.cam2_blur_regions = []
 
-
-
+        self.cam0_dragging = False
+        self.cam1_dragging = False
+        self.cam2_dragging = False
 
 
         # # process passthrough topics and other topics
@@ -167,13 +168,15 @@ class Application:
     def cam0_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             # dragging
-            dragging = True
+            self.cam0_dragging = True
             self.cam0_drag_start_x = x
             self.cam0_drag_start_y = y
+            self.cam0_drag_end_x = x
+            self.cam0_drag_end_y = y
 
         elif event == cv2.EVENT_MOUSEMOVE:
             # dragging
-            if dragging:
+            if self.cam0_dragging:
                 self.cam0_drag_end_x = x
                 self.cam0_drag_end_y = y
 
@@ -182,7 +185,7 @@ class Application:
 
         elif event == cv2.EVENT_LBUTTONUP:
             # dragging
-            dragging = False
+            self.cam0_dragging = False
             self.cam0_drag_end_x = x
             self.cam0_drag_end_y = y
 
@@ -193,13 +196,15 @@ class Application:
     def cam1_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             # dragging
-            dragging = True
+            self.cam1_dragging = True
             self.cam1_drag_start_x = x
             self.cam1_drag_start_y = y
+            self.cam1_drag_end_x = x
+            self.cam1_drag_end_y = y
 
         elif event == cv2.EVENT_MOUSEMOVE:
             # dragging
-            if dragging:
+            if self.cam1_dragging:
                 self.cam1_drag_end_x = x
                 self.cam1_drag_end_y = y
 
@@ -208,7 +213,7 @@ class Application:
 
         elif event == cv2.EVENT_LBUTTONUP:
             # dragging
-            dragging = False
+            self.cam1_dragging = False
             self.cam1_drag_end_x = x
             self.cam1_drag_end_y = y
 
@@ -219,13 +224,15 @@ class Application:
     def cam2_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             # dragging
-            dragging = True
+            self.cam2_dragging = True
             self.cam2_drag_start_x = x
             self.cam2_drag_start_y = y
+            self.cam2_drag_end_x = x
+            self.cam2_drag_end_y = y
 
         elif event == cv2.EVENT_MOUSEMOVE:
             # dragging
-            if dragging:
+            if self.cam2_dragging:
                 self.cam2_drag_end_x = x
                 self.cam2_drag_end_y = y
 
@@ -234,7 +241,7 @@ class Application:
 
         elif event == cv2.EVENT_LBUTTONUP:
             # dragging
-            dragging = False
+            self.cam2_dragging = False
             self.cam2_drag_end_x = x
             self.cam2_drag_end_y = y
 
@@ -321,10 +328,20 @@ class Application:
         for region in self.cam2_blur_regions[self.current_frame]:
             region.draw_border(self.cam2_display_image, (0, 0, 255), 2)
 
+    def draw_live_blur_regions(self):
+        if self.cam0_dragging:
+            cv2.rectangle(self.cam0_display_image, (self.cam0_drag_start_x, self.cam0_drag_start_y), (self.cam0_drag_end_x, self.cam0_drag_end_y), (0, 0, 255), 2)
+        if self.cam1_dragging:
+            cv2.rectangle(self.cam1_display_image, (self.cam1_drag_start_x, self.cam1_drag_start_y), (self.cam1_drag_end_x, self.cam1_drag_end_y), (0, 0, 255), 2)
+        if self.cam2_dragging:
+            cv2.rectangle(self.cam2_display_image, (self.cam2_drag_start_x, self.cam2_drag_start_y), (self.cam2_drag_end_x, self.cam2_drag_end_y), (0, 0, 255), 2)
+            
+
     def generate_display_image(self):
         self.reset_display_image()
         self.draw_crosshair()
         self.draw_blur_regions_border()
+        self.draw_live_blur_regions()
 
     # def write_images_to_bag(self):
     #     # modify the image to gray
