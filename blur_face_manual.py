@@ -87,6 +87,20 @@ class Application:
         self.cam1_dragging = False
         self.cam2_dragging = False
 
+        self.threashold_distance = 30
+
+        self.cam0_dragging = False
+        self.cam0_moved_enoughed_distance = False
+        self.cam0_have_previous_region = False
+
+        self.cam1_dragging = False
+        self.cam1_moved_enoughed_distance = False
+        self.cam1_have_previous_region = False
+
+        self.cam2_dragging = False
+        self.cam2_moved_enoughed_distance = False
+        self.cam2_have_previous_region = False
+
 
         # # process passthrough topics and other topics
         # self.process_passthrough_and_other_topics()
@@ -167,87 +181,137 @@ class Application:
     # Mouse event callback function to update mouse position
     def cam0_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            # dragging
             self.cam0_dragging = True
+
             self.cam0_drag_start_x = x
             self.cam0_drag_start_y = y
             self.cam0_drag_end_x = x
             self.cam0_drag_end_y = y
 
         elif event == cv2.EVENT_MOUSEMOVE:
-            # dragging
+            self.cam0_drag_end_x = x
+            self.cam0_drag_end_y = y
+
             if self.cam0_dragging:
-                self.cam0_drag_end_x = x
-                self.cam0_drag_end_y = y
+                self.cam0_moved_enoughed_distance = (self.cam0_drag_end_x - self.cam0_drag_start_x)**2 + (self.cam0_drag_end_y - self.cam0_drag_start_y)**2 > self.threashold_distance**2
 
             # position
             self.cam0_mouse_x, self.cam0_mouse_y = x, y
 
         elif event == cv2.EVENT_LBUTTONUP:
-            # dragging
-            self.cam0_dragging = False
             self.cam0_drag_end_x = x
             self.cam0_drag_end_y = y
+            self.cam0_moved_enoughed_distance = (self.cam0_drag_end_x - self.cam0_drag_start_x)**2 + (self.cam0_drag_end_y - self.cam0_drag_start_y)**2 > self.threashold_distance**2
 
-            # add blur region
-            blur_region = BlurRegion(self.cam0_drag_start_x, self.cam0_drag_start_y, self.cam0_drag_end_x, self.cam0_drag_end_y)
-            self.cam0_blur_regions[self.current_frame].append(blur_region)
+            if self.cam0_moved_enoughed_distance:
+                # add blur region from dragged region
+                blur_region = BlurRegion(self.cam0_drag_start_x, self.cam0_drag_start_y, self.cam0_drag_end_x, self.cam0_drag_end_y)
+                self.cam0_blur_regions[self.current_frame].append(blur_region)
+
+                # save width and height
+                self.cam0_previous_width = abs(self.cam0_drag_end_x - self.cam0_drag_start_x)
+                self.cam0_previous_height = abs(self.cam0_drag_end_y - self.cam0_drag_start_y)
+                self.cam0_have_previous_region = True
+            else:
+                # add blur region from saved width and height
+                if self.cam0_have_previous_region:
+                    blur_region = BlurRegion(x - self.cam0_previous_width, 
+                                             y - self.cam0_previous_height, 
+                                             x,
+                                             y)
+                    self.cam0_blur_regions[self.current_frame].append(blur_region)
+
+            self.cam0_dragging = False
+            
     
     def cam1_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            # dragging
             self.cam1_dragging = True
+
             self.cam1_drag_start_x = x
             self.cam1_drag_start_y = y
             self.cam1_drag_end_x = x
             self.cam1_drag_end_y = y
 
         elif event == cv2.EVENT_MOUSEMOVE:
-            # dragging
+            self.cam1_drag_end_x = x
+            self.cam1_drag_end_y = y
+
             if self.cam1_dragging:
-                self.cam1_drag_end_x = x
-                self.cam1_drag_end_y = y
+                self.cam1_moved_enoughed_distance = (self.cam1_drag_end_x - self.cam1_drag_start_x)**2 + (self.cam1_drag_end_y - self.cam1_drag_start_y)**2 > self.threashold_distance**2
 
             # position
             self.cam1_mouse_x, self.cam1_mouse_y = x, y
 
         elif event == cv2.EVENT_LBUTTONUP:
-            # dragging
-            self.cam1_dragging = False
             self.cam1_drag_end_x = x
             self.cam1_drag_end_y = y
+            self.cam1_moved_enoughed_distance = (self.cam1_drag_end_x - self.cam1_drag_start_x)**2 + (self.cam1_drag_end_y - self.cam1_drag_start_y)**2 > self.threashold_distance**2
 
-            # add blur region
-            blur_region = BlurRegion(self.cam1_drag_start_x, self.cam1_drag_start_y, self.cam1_drag_end_x, self.cam1_drag_end_y)
-            self.cam1_blur_regions[self.current_frame].append(blur_region)
-        
+            if self.cam1_moved_enoughed_distance:
+                # add blur region from dragged region
+                blur_region = BlurRegion(self.cam1_drag_start_x, self.cam1_drag_start_y, self.cam1_drag_end_x, self.cam1_drag_end_y)
+                self.cam1_blur_regions[self.current_frame].append(blur_region)
+
+                # save width and height
+                self.cam1_previous_width = abs(self.cam1_drag_end_x - self.cam1_drag_start_x)
+                self.cam1_previous_height = abs(self.cam1_drag_end_y - self.cam1_drag_start_y)
+                self.cam1_have_previous_region = True
+            else:
+                # add blur region from saved width and height
+                if self.cam1_have_previous_region:
+                    blur_region = BlurRegion(x - self.cam1_previous_width, 
+                                             y - self.cam1_previous_height, 
+                                             x,
+                                             y)
+                    self.cam1_blur_regions[self.current_frame].append(blur_region)
+
+            self.cam1_dragging = False
+
     def cam2_mouse_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            # dragging
             self.cam2_dragging = True
+
             self.cam2_drag_start_x = x
             self.cam2_drag_start_y = y
             self.cam2_drag_end_x = x
             self.cam2_drag_end_y = y
 
         elif event == cv2.EVENT_MOUSEMOVE:
-            # dragging
+            self.cam2_drag_end_x = x
+            self.cam2_drag_end_y = y
+
             if self.cam2_dragging:
-                self.cam2_drag_end_x = x
-                self.cam2_drag_end_y = y
+                self.cam2_moved_enoughed_distance = (self.cam2_drag_end_x - self.cam2_drag_start_x)**2 + (self.cam2_drag_end_y - self.cam2_drag_start_y)**2 > self.threashold_distance**2
 
             # position
             self.cam2_mouse_x, self.cam2_mouse_y = x, y
 
         elif event == cv2.EVENT_LBUTTONUP:
-            # dragging
-            self.cam2_dragging = False
             self.cam2_drag_end_x = x
             self.cam2_drag_end_y = y
+            self.cam2_moved_enoughed_distance = (self.cam2_drag_end_x - self.cam2_drag_start_x)**2 + (self.cam2_drag_end_y - self.cam2_drag_start_y)**2 > self.threashold_distance**2
 
-            # add blur region
-            blur_region = BlurRegion(self.cam2_drag_start_x, self.cam2_drag_start_y, self.cam2_drag_end_x, self.cam2_drag_end_y)
-            self.cam2_blur_regions[self.current_frame].append(blur_region)
+            if self.cam2_moved_enoughed_distance:
+                # add blur region from dragged region
+                blur_region = BlurRegion(self.cam2_drag_start_x, self.cam2_drag_start_y, self.cam2_drag_end_x, self.cam2_drag_end_y)
+                self.cam2_blur_regions[self.current_frame].append(blur_region)
+
+                # save width and height
+                self.cam2_previous_width = abs(self.cam2_drag_end_x - self.cam2_drag_start_x)
+                self.cam2_previous_height = abs(self.cam2_drag_end_y - self.cam2_drag_start_y)
+                self.cam2_have_previous_region = True
+            else:
+                # add blur region from saved width and height
+                if self.cam2_have_previous_region:
+                    blur_region = BlurRegion(x - self.cam2_previous_width, 
+                                             y - self.cam2_previous_height, 
+                                             x,
+                                             y)
+                    self.cam2_blur_regions[self.current_frame].append(blur_region)
+
+            self.cam2_dragging = False
+
 
     def initialize_window(self):
         # display windows
@@ -320,6 +384,50 @@ class Application:
             cv2.line(self.cam2_display_image, (self.cam2_mouse_x - line_length, self.cam2_mouse_y), (self.cam2_mouse_x + line_length, self.cam2_mouse_y), color, thickness)
             cv2.line(self.cam2_display_image, (self.cam2_mouse_x, self.cam2_mouse_y - line_length), (self.cam2_mouse_x, self.cam2_mouse_y + line_length), color, thickness)
 
+    def draw_crosshair_or_previous_region(self):
+        # Draw horizontal and vertical lines to create the crosshair
+        line_length = 20
+        color = (0, 0, 255)  # Red color for the crosshair
+        thickness = 2
+
+        if self.cam0_mouse_x != -1 and self.cam0_mouse_y != -1:
+            if self.cam0_have_previous_region:
+                cv2.rectangle(self.cam0_display_image, 
+                              (self.cam0_mouse_x - self.cam0_previous_width, 
+                               self.cam0_mouse_y - self.cam0_previous_height),
+                              (self.cam0_mouse_x,
+                               self.cam0_mouse_y),
+                              color, thickness)
+            else :
+                cv2.line(self.cam0_display_image, (self.cam0_mouse_x - line_length, self.cam0_mouse_y), (self.cam0_mouse_x + line_length, self.cam0_mouse_y), color, thickness)
+                cv2.line(self.cam0_display_image, (self.cam0_mouse_x, self.cam0_mouse_y - line_length), (self.cam0_mouse_x, self.cam0_mouse_y + line_length), color, thickness)
+        
+        if self.cam1_mouse_x != -1 and self.cam1_mouse_y != -1:
+            if self.cam1_have_previous_region:
+                cv2.rectangle(self.cam1_display_image, 
+                              (self.cam1_mouse_x - self.cam1_previous_width, 
+                               self.cam1_mouse_y - self.cam1_previous_height),
+                              (self.cam1_mouse_x,
+                               self.cam1_mouse_y),
+                              color, thickness)
+            else :
+                cv2.line(self.cam1_display_image, (self.cam1_mouse_x - line_length, self.cam1_mouse_y), (self.cam1_mouse_x + line_length, self.cam1_mouse_y), color, thickness)
+                cv2.line(self.cam1_display_image, (self.cam1_mouse_x, self.cam1_mouse_y - line_length), (self.cam1_mouse_x, self.cam1_mouse_y + line_length), color, thickness)
+        
+        if self.cam2_mouse_x != -1 and self.cam2_mouse_y != -1:
+            if self.cam2_have_previous_region:
+                cv2.rectangle(self.cam2_display_image, 
+                              (self.cam2_mouse_x - self.cam2_previous_width, 
+                               self.cam2_mouse_y - self.cam2_previous_height),
+                              (self.cam2_mouse_x,
+                               self.cam2_mouse_y),
+                              color, thickness)
+            else :
+                cv2.line(self.cam2_display_image, (self.cam2_mouse_x - line_length, self.cam2_mouse_y), (self.cam2_mouse_x + line_length, self.cam2_mouse_y), color, thickness)
+                cv2.line(self.cam2_display_image, (self.cam2_mouse_x, self.cam2_mouse_y - line_length), (self.cam2_mouse_x, self.cam2_mouse_y + line_length), color, thickness)
+        
+        
+
     def draw_blur_regions_border(self):
         for region in self.cam0_blur_regions[self.current_frame]:
             region.draw_border(self.cam0_display_image, (0, 0, 255), 2)
@@ -329,17 +437,17 @@ class Application:
             region.draw_border(self.cam2_display_image, (0, 0, 255), 2)
 
     def draw_live_blur_regions(self):
-        if self.cam0_dragging:
+        if self.cam0_dragging and self.cam0_moved_enoughed_distance:
             cv2.rectangle(self.cam0_display_image, (self.cam0_drag_start_x, self.cam0_drag_start_y), (self.cam0_drag_end_x, self.cam0_drag_end_y), (0, 0, 255), 2)
-        if self.cam1_dragging:
+        if self.cam1_dragging and self.cam1_moved_enoughed_distance:
             cv2.rectangle(self.cam1_display_image, (self.cam1_drag_start_x, self.cam1_drag_start_y), (self.cam1_drag_end_x, self.cam1_drag_end_y), (0, 0, 255), 2)
-        if self.cam2_dragging:
+        if self.cam2_dragging and self.cam2_moved_enoughed_distance:
             cv2.rectangle(self.cam2_display_image, (self.cam2_drag_start_x, self.cam2_drag_start_y), (self.cam2_drag_end_x, self.cam2_drag_end_y), (0, 0, 255), 2)
             
 
     def generate_display_image(self):
         self.reset_display_image()
-        self.draw_crosshair()
+        self.draw_crosshair_or_previous_region()
         self.draw_blur_regions_border()
         self.draw_live_blur_regions()
 
