@@ -96,7 +96,9 @@ class Application:
         # self.process_passthrough_and_other_topics()
 
         # process camera topics
-        self.initialize_window()
+        self.create_window()
+        self.register_callbacks()
+
         for ith in range(3):
             self.load_images_from_bag(ith)
             self.initialize_blur_regions(ith)
@@ -204,8 +206,11 @@ class Application:
                     self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
             self.cam[ith].dragging = False
+        
+        self.generate_display_image(ith)
+        self.update_window(ith)
 
-    def initialize_window(self):
+    def create_window(self):
         # display windows
         cv2.namedWindow('cam0', cv2.WINDOW_NORMAL)
         cv2.namedWindow('cam1', cv2.WINDOW_NORMAL)
@@ -221,11 +226,10 @@ class Application:
         cv2.moveWindow('cam1', 0, 0)
         cv2.moveWindow('cam2', 1280, 0)
 
-        # set callbacks
+    def register_callbacks(self):
         cv2.setMouseCallback('cam0', self.mouse_callback, param=0)
         cv2.setMouseCallback('cam1', self.mouse_callback, param=1)
         cv2.setMouseCallback('cam2', self.mouse_callback, param=2)
-        
 
     def read_images_at_current_frame(self, ith):
         # get first msg
@@ -304,10 +308,6 @@ class Application:
 
     def run(self):
         while True:
-            for ith in range(3):
-                self.generate_display_image(ith)
-                self.update_window(ith)
-
             key = cv2.waitKey(1)
             if key == ord('q'):
                 break
