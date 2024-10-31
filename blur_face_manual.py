@@ -1,7 +1,7 @@
 # path
 from pathlib import Path
 # rosbags
-from rosbags.highlevel import AnyReader
+from rosbags.highlevel import AnyReader, AnyReaderError
 from rosbags.rosbag1 import Writer, WriterError
 from rosbags.typesys import get_typestore, Stores
 from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage as CompressedImage
@@ -165,11 +165,21 @@ class Application:
         # read images from bag
         bag = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
         bag2 = Path('new.bag')
+        self.input_bag_path = bag
         cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
         cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
         cam2_topic = '/alphasense_driver_ros/cam2/debayered/image/compressed'
         cam_topics = [cam0_topic, cam1_topic, cam2_topic]
-        self.read_images_from_bag(bag, cam_topics)
+
+        reader = self.create_reader(self.input_bag_path)
+        if reader:
+            reader.open()
+            self.read_images_from_bag(reader, cam_topics)
+            reader.close()
+        else:
+            print('Quitting.')
+            exit(1)
+        
 
         self.other_topics_action = Action.FILTER
 
@@ -352,31 +362,40 @@ class Application:
         for ith in range(3):
             self.cam[ith].blur_regions = loaded_cam[ith].blur_regions
         
-    def read_images_from_bag(self, path, cam_topics):        
-        reader = AnyReader([path], default_typestore=self.typestore)
-        reader.open()
-
+    def read_images_from_bag(self, reader, cam_topics):     
         self.cam = [Cam() for _ in range(len(cam_topics))]
         for ith, cam_topic in enumerate(cam_topics):
             for connection in reader.connections:
                 if connection.topic == cam_topic:
+                    print(f'Reading messages for {cam_topic}')
                     self.cam[ith].msg_list = list(reader.messages(connections=[connection]))
                     self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
 
-        reader.close()
+    def create_reader(self, path):
+        try:
+            reader = AnyReader([path], default_typestore=self.typestore)
+            return reader
+        except AnyReaderError as e:
+            print(f'Cannot open the bag file "{path}".')
+            return None
+        except Exception as e:
+            print('An error occurred while opening the bag file.')
+            print (e)
+            return None
 
-    def write_images_to_bag(self, path):
+    def create_writer(self, path):
         # create bag file
         try:
             writer = Writer(path)
+            return writer
         except WriterError as e:
             print('Bag already exists, please rename or delete the existing bag and try again.')
-            return
+            return None
         except Exception as e:
             print('An error occurred while opening the bag file.')
-            return
-        writer.open()
+            return None
 
+    def write_images_to_bag(self, writer):
         # for each camera
         for ith, cam in enumerate(self.cam):
             input_connection, _, _ = cam.msg_list[0]
@@ -401,9 +420,23 @@ class Application:
                     writer.write(output_connection, output_timestamp, output_rawdata)
                 else:
                     writer.write(output_connection, input_timestamp, input_rawdata)
-        
-        writer.close()
-        print(f'Bag file written to {path}')
+
+    def write_other_topics_to_bag(self, reader, writer):
+        # process passthrough topics and other topics
+        for input_connection in reader.connections:
+            if input_connection.topic in self.passthrough_topics:
+                output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)
+                for input_connection, timestamp, rawdata in reader.messages(connections=[input_connection]):
+                    print(f'Writing message of timestamp {timestamp} for topic {input_connection.topic}')
+                    writer.write(output_connection, timestamp, rawdata)
+            else:
+                if self.other_topics_action == Action.PASSTHROUGH:
+                    output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)
+                    for input_connection, timestamp, rawdata in reader.messages(connections=[input_connection]):
+                        print(f'Writing message of timestamp {timestamp} for topic {input_connection.topic}')
+                        writer.write(output_connection, timestamp, rawdata)
+                elif self.other_topics_action == Action.FILTER:
+                    pass
 
     def run(self):
         while True:
@@ -435,14 +468,26 @@ class Application:
                 for ith in range(3):
                     self.render_window(ith)
             elif key == ord('w'):
-                path = Path('new.bag')
-                self.write_images_to_bag(path)
-            else:
-                continue
+                new_path = Path('new3.bag')
+                
+                writer = self.create_writer(new_path)
+                reader = self.create_reader(self.input_bag_path)
+                if writer and reader:
+                    writer.open()
+                    reader.open()
+
+                    self.write_images_to_bag(writer)
+                    self.write_other_topics_to_bag(reader, writer)
+                    
+                    writer.close()
+                    reader.close()
+                    print(f'Bag file written to {writer.path}')
+                else:
+                    continue
 
         cv2.destroyAllWindows()
-        # self.close_writer()
 
 
-app = Application()
-app.run()
+if __name__ == '__main__':
+    app = Application()
+    app.run()
