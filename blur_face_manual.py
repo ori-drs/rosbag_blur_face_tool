@@ -18,7 +18,10 @@ class Action(Enum):
     FILTER = 2
 
 class BlurRegion:
-    def __init__(self, start_x, start_y, end_x, end_y):
+    def __init__(self):
+        pass
+
+    def set_region(self, start_x, start_y, end_x, end_y):
         self.start_x = start_x
         self.start_y = start_y
         self.end_x = end_x
@@ -29,7 +32,13 @@ class BlurRegion:
     
     def draw_border(self, image, color, thickness):
         cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
+    
+    def __str__(self):
+        return f'{self.start_x} {self.start_y} {self.end_x} {self.end_y}'
 
+    def from_str(self, s):
+        self.start_x, self.start_y, self.end_x, self.end_y = map(int, s.split())
+        return self
 
 class Cam:
     def __init__(self):
@@ -57,6 +66,55 @@ class Cam:
         self.have_previous_region = False
         self.previous_width = 0
         self.previous_height = 0
+    
+    def __str__(self):
+        string = ''
+        for frame, regions in enumerate(self.blur_regions):
+            for region in regions:
+                string += f'{frame} {region}\n'
+        return string
+    
+    def from_str(self, s):
+        lines = s.split('\n')
+        self.blur_regions = [[] for _ in range(len(lines))]
+        for line in lines:
+            if line:
+                frame, region_str = line.split(' ', 1)
+                blur_region = BlurRegion()
+                blur_region.from_str(region_str)
+                self.blur_regions[int(frame)].append(blur_region)
+        return self
+
+class SaveFileHandler:
+
+    def __init__(self):
+        pass
+
+    def write_to_save_file(self, path, cams):
+        with open(path, 'w') as f:
+            for ith, cam in enumerate(cams):
+                f.write(f'cam{ith} {len(cam.blur_regions)}\n')
+                f.write(str(cam))
+    
+    def read_from_save_file(self, path):
+        cams = []
+
+        with open(path, 'r') as f:
+            lines = f.readlines()
+
+            current_cam = None
+            for line in lines:
+                if line.startswith('cam'):
+                    length = int(line[5:])
+                    current_cam = Cam()
+                    current_cam.blur_regions = [[] for _ in range(length)]
+                    cams.append(current_cam)
+                else:
+                    index, region_str = line.split(' ', 1)
+                    blur_region = BlurRegion().from_str(region_str)
+                    current_cam.blur_regions[int(index)].append(blur_region)
+            
+        return cams
 
 class Application:
 
@@ -189,7 +247,8 @@ class Application:
 
             if self.cam[ith].moved_enoughed_distance:
                 # add blur region from dragged region
-                blur_region = BlurRegion(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
+                blur_region = BlurRegion()
+                blur_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
                 self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
                 # save width and height
@@ -199,10 +258,11 @@ class Application:
             else:
                 # add blur region from saved width and height
                 if self.cam[ith].have_previous_region:
-                    blur_region = BlurRegion(x - self.cam[ith].previous_width, 
-                                             y - self.cam[ith].previous_height, 
-                                             x,
-                                             y)
+                    blur_region = BlurRegion()
+                    blur_region.set_region( x - self.cam[ith].previous_width,
+                                            y - self.cam[ith].previous_height, 
+                                            x,
+                                            y)
                     self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
             self.cam[ith].dragging = False
@@ -305,6 +365,16 @@ class Application:
     #     new_timestamp = timestamp
     #     self.writer.write(new_connection, new_timestamp, new_rawdata)
 
+    def save_regions_to_file(self, path):
+        save_file_handler = SaveFileHandler()
+        save_file_handler.write_to_save_file(path, self.cam)
+
+    def load_regions_from_file(self, path):
+        save_file_handler = SaveFileHandler()
+        loaded_cam = save_file_handler.read_from_save_file(path)
+        for ith in range(3):
+            self.cam[ith].blur_regions = loaded_cam[ith].blur_regions
+        
 
     def run(self):
         while True:
@@ -321,6 +391,13 @@ class Application:
                 self.increase_frame()
                 for ith in range(3):
                     self.read_images_at_current_frame(ith)
+                    self.generate_display_image(ith)
+                    self.update_window(ith)
+            elif key == ord('s'):
+                self.save_regions_to_file('save.txt')
+            elif key == ord('l'):
+                self.load_regions_from_file('save.txt')
+                for ith in range(3):
                     self.generate_display_image(ith)
                     self.update_window(ith)
             else:
