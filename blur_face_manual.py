@@ -114,8 +114,13 @@ class SaveFileHandler:
             for ith, cam in enumerate(cams):
                 f.write(f'cam{ith} {len(cam.blur_regions)}\n')
                 f.write(str(cam))
+        print(f'Save file written to "./{path}".')
     
     def read_from_save_file(self, path):
+        if not Path(path).exists():
+            print(f'Save file "./{path}" does not exist.')
+            return None
+
         cams = []
 
         with open(path, 'r') as f:
@@ -132,7 +137,9 @@ class SaveFileHandler:
                     index, region_str = line.split(' ', 1)
                     blur_region = BlurRegion().from_str(region_str)
                     current_cam.blur_regions[int(index)].append(blur_region)
-            
+        
+        print(f'Save file read from "./{path}".')
+
         return cams
 
 # image processing
@@ -168,9 +175,13 @@ class Application:
             '/hesai/pandar'
         ]
 
-        # read images from bag
+        # process path
         self.input_bag_path = input_bag_path
+        self.bag_name = self.input_bag_path.stem
+        self.save_name = self.bag_name + '_save.txt'
+        self.output_bag_name = self.bag_name + '_blurred.bag'
 
+        # read image from bag
         reader = self.create_reader(self.input_bag_path)
         if reader:
             reader.open()
@@ -359,8 +370,9 @@ class Application:
     def load_regions_from_file(self, path):
         save_file_handler = SaveFileHandler()
         loaded_cam = save_file_handler.read_from_save_file(path)
-        for ith in range(3):
-            self.cam[ith].blur_regions = loaded_cam[ith].blur_regions
+        if loaded_cam:    
+            for ith in range(3):
+                self.cam[ith].blur_regions = loaded_cam[ith].blur_regions
         
     def read_images_from_bag(self, reader, cam_topics):     
         self.cam = [Cam() for _ in range(len(cam_topics))]
@@ -454,9 +466,9 @@ class Application:
                     self.read_images_at_current_frame(ith)
                     self.render_window(ith)
             elif key == ord('s'):
-                self.save_regions_to_file('save.txt')
+                self.save_regions_to_file(self.save_name)
             elif key == ord('l'):
-                self.load_regions_from_file('save.txt')
+                self.load_regions_from_file(self.save_name)
                 for ith in range(3):
                     self.render_window(ith)
             elif key == ord('b'):
@@ -468,7 +480,7 @@ class Application:
                 for ith in range(3):
                     self.render_window(ith)
             elif key == ord('w'):
-                new_path = Path('new3.bag')
+                new_path = Path(self.output_bag_name)
                 
                 writer = self.create_writer(new_path)
                 reader = self.create_reader(self.input_bag_path)
