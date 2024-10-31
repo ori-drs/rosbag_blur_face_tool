@@ -23,6 +23,11 @@ class DisplayType(Enum):
     PREBLUR = 1
     BLURRED = 2
 
+class BorderShape(Enum):
+    RECTANGLE = 1
+    ELLIPSE = 2
+    BOTH = 3
+
 class BlurRegion:
     def __init__(self):
         pass
@@ -71,19 +76,37 @@ class BlurRegion:
     def contains(self, x, y):
         return self.start_x <= x <= self.end_x and self.start_y <= y <= self.end_y
     
-    def draw_border(self, image, color = (0, 0, 255), thickness = 2):
+    def draw_rectangle(self, image, color = (0, 0, 255), thickness = 2):
         cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
+    
+    def draw_ellipse(self, image, color = (0, 0, 255), thickness = 2):
+        cv2.ellipse(image, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, color, thickness = thickness)
 
-    def draw_border_with_crosshair(self, image, color = (0, 0, 255), thickness = 2):
-        self.draw_border(image, color, thickness)
+    def draw_border(self, image, color = (0, 0, 255), thickness = 2, shape = BorderShape.ELLIPSE):
+        if shape == BorderShape.RECTANGLE:
+            self.draw_rectangle(image, color, thickness)
+        elif shape == BorderShape.ELLIPSE:
+            self.draw_ellipse(image, color, thickness)
+        elif shape == BorderShape.BOTH:
+            self.draw_rectangle(image, color, thickness)
+            self.draw_ellipse(image, color, thickness)
+
+    def draw_border_with_crosshair(self, image, color = (0, 0, 255), thickness = 2, shape = BorderShape.ELLIPSE):
+        self.draw_border(image, color, thickness, shape)
         crosshair_x = (self.start_x + self.end_x) // 2
         crosshair_y = (self.start_y + self.end_y) // 2
         draw_crosshair(image, (crosshair_x, crosshair_y))
     
-    def blur_region(self, image):
-        region = image[self.start_y:self.end_y, self.start_x:self.end_x]
-        average_color = region.mean(axis=(0, 1), dtype=int)
-        image[self.start_y:self.end_y, self.start_x:self.end_x] = average_color
+    def blur_region(self, image, shape = BorderShape.ELLIPSE):
+        if shape == BorderShape.RECTANGLE:
+            region = image[self.start_y:self.end_y, self.start_x:self.end_x]
+            average_color = region.mean(axis=(0, 1), dtype=int)
+            image[self.start_y:self.end_y, self.start_x:self.end_x] = average_color
+        elif shape == BorderShape.ELLIPSE or self.shape == BorderShape.BOTH:
+            mask = np.zeros(image.shape[:2], dtype=np.uint8)  # Create a single-channel mask
+            cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
+            average_color = cv2.mean(image, mask=mask)[:3]
+            image[mask == 255] = average_color
     
     def __str__(self):
         return f'{self.start_x} {self.start_y} {self.end_x} {self.end_y}'
@@ -403,7 +426,7 @@ class Application:
         if self.cam[ith].dragging and self.cam[ith].moved_enoughed_distance:
             live_region = BlurRegion()
             live_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
-            live_region.draw_border(window_content)
+            live_region.draw_border_with_crosshair(window_content)
         
         # update window
         cv2.imshow('cam'+str(ith), window_content)
