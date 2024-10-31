@@ -124,31 +124,28 @@ class Application:
         self.typestore = get_typestore(Stores.ROS1_NOETIC)
         self.bridge = CvBridge()
 
-        # input bag
-        reader_bag_path = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
-        self.setup_reader(reader_bag_path)
-
         # output bag
         writer_bag_path = Path('new.bag')
         # self.setup_writer(writer_bag_path)
-
-        # camera topics
-        self.camera_topics = [
-            '/alphasense_driver_ros/cam0/debayered/image/compressed',
-            '/alphasense_driver_ros/cam1/debayered/image/compressed',
-            '/alphasense_driver_ros/cam2/debayered/image/compressed'
-            ]
 
         self.passthrough_topics = [
             '/alphasense_driver_ros/imu',
             '/hesai/pandar'
         ]
 
+        # read images from bag
+        bag = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
+        cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
+        cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
+        cam2_topic = '/alphasense_driver_ros/cam2/debayered/image/compressed'
+        cam_topics = [cam0_topic, cam1_topic, cam2_topic]
+        self.read_images_from_bag(bag, cam_topics)
+
         self.other_topics_action = Action.FILTER
 
         self.current_frame = 0
         self.threashold_distance = 30
-        self.cam = [Cam() for _ in range(3)]
+        
 
         # # process passthrough topics and other topics
         # self.process_passthrough_and_other_topics()
@@ -158,7 +155,6 @@ class Application:
         self.register_callbacks()
 
         for ith in range(3):
-            self.load_images_from_bag(ith)
             self.initialize_blur_regions(ith)
             self.read_images_at_current_frame(ith)
             self.generate_display_image(ith)
@@ -176,27 +172,12 @@ class Application:
             data=np.frombuffer(compressed_image, dtype=np.uint8),
         )
 
-    def setup_reader(self, bag_path):
-        self.reader = AnyReader([bag_path], default_typestore=self.typestore)
-        self.reader.open()
-
-    def close_reader(self):
-        self.reader.close()
-
     def setup_writer(self, bag_path):
         self.writer = Writer(bag_path)
         self.writer.open()
 
     def close_writer(self):
         self.writer.close()
-
-
-    def load_images_from_bag(self, ith):
-        # get the three lists of messages
-        for connection in self.reader.connections:
-            if connection.topic == self.camera_topics[ith]:
-                self.cam[ith].msg_list = list(self.reader.messages(connections=[connection]))
-                self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
 
     def initialize_blur_regions(self, ith):
         self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
@@ -205,7 +186,7 @@ class Application:
         # process passthrough topics and other topics
         for connection in self.reader.connections:
 
-            if connection.topic in self.camera_topics:
+            if connection.topic in self.cam_topics:
                 pass
             elif connection.topic in self.passthrough_topics:
                 new_connection = self.writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=self.typestore)
@@ -375,6 +356,15 @@ class Application:
         for ith in range(3):
             self.cam[ith].blur_regions = loaded_cam[ith].blur_regions
         
+    def read_images_from_bag(self, path, cam_topics):        
+        self.reader = AnyReader([path], default_typestore=self.typestore)
+        self.cam = [Cam() for _ in range(len(cam_topics))]
+        with self.reader as reader:
+            for ith, cam_topic in enumerate(cam_topics):
+                for connection in reader.connections:
+                    if connection.topic == cam_topic:
+                        self.cam[ith].msg_list = list(reader.messages(connections=[connection]))
+                        self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
 
     def run(self):
         while True:
@@ -404,7 +394,6 @@ class Application:
                 continue
 
         cv2.destroyAllWindows()
-        self.close_reader()
         # self.close_writer()
 
 
