@@ -112,7 +112,7 @@ class BlurRegion:
         return f'{self.start_x} {self.start_y} {self.end_x} {self.end_y}'
 
     def from_str(self, s):
-        self.start_x, self.start_y, self.end_x, self.end_y = map(int, s.split())
+        self.set_region(*map(int, s.split(' ')))
         return self
 
 class Cam:
@@ -431,11 +431,11 @@ class Application:
         # update window
         cv2.imshow('cam'+str(ith), window_content)
 
-    def save_regions_to_file(self, path):
+    def write_regions_to_file(self, path):
         save_file_handler = SaveFileHandler()
         save_file_handler.write_to_save_file(path, self.cam)
 
-    def load_regions_from_file(self, path):
+    def read_regions_from_file(self, path):
         save_file_handler = SaveFileHandler()
         loaded_cam = save_file_handler.read_from_save_file(path)
         if loaded_cam:    
@@ -518,7 +518,7 @@ class Application:
                 elif self.other_topics_action == Action.FILTER:
                     pass
 
-    def write_data_to_bag(self):
+    def export_data_to_bag(self):
         new_path = Path(self.output_bag_name)
                 
         writer = self.create_writer(new_path)
@@ -593,12 +593,12 @@ class Application:
                 self.increase_frame(10)
             elif key == ord('q'):
                 break
-            elif key == ord('w'):
-                self.write_data_to_bag()
             elif key == ord('e'):
-                self.save_regions_to_file(self.save_name)
+                self.export_data_to_bag()
+            elif key == ord('w'):
+                self.write_regions_to_file(self.save_name)
             elif key == ord('r'):
-                self.load_regions_from_file(self.save_name)
+                self.read_regions_from_file(self.save_name)
                 for ith in range(3):
                     self.render_window(ith)
             elif key == ord('b'):
