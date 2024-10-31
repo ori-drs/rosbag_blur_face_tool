@@ -297,7 +297,11 @@ class Application:
                     self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
             self.cam[ith].dragging = False
-        
+        elif event == cv2.EVENT_RBUTTONDOWN:
+            for region in reversed(self.cam[ith].blur_regions[self.current_frame]):
+                if region.contains(self.cam[ith].mouse_x, self.cam[ith].mouse_y):
+                    self.cam[ith].blur_regions[self.current_frame].remove(region)
+                    break
         self.render_window(ith)
 
     def create_window(self):
@@ -488,6 +492,15 @@ class Application:
                 added_region = True
         if added_region:
             self.increase_frame(1)
+
+    def delete_region_under_cursor(self):
+        for ith in range(3):
+            if self.cam[ith].mouse_in_window:
+                for region in reversed(self.cam[ith].blur_regions[self.current_frame]):
+                    if region.contains(self.cam[ith].mouse_x, self.cam[ith].mouse_y):
+                        self.cam[ith].blur_regions[self.current_frame].remove(region)
+                        self.render_window(ith)
+                        break
 
     def run(self):
         while True:
