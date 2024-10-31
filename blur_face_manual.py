@@ -115,11 +115,11 @@ class SaveFileHandler:
             for ith, cam in enumerate(cams):
                 f.write(f'cam{ith} {len(cam.blur_regions)}\n')
                 f.write(str(cam))
-        print(f'Save file written to "./{path}".')
+        print(f'blurred regions written to "./{path}".')
     
     def read_from_save_file(self, path):
         if not Path(path).exists():
-            print(f'Save file "./{path}" does not exist.')
+            print(f'file "./{path}" does not exist.')
             return None
 
         cams = []
@@ -139,7 +139,7 @@ class SaveFileHandler:
                     blur_region = BlurRegion().from_str(region_str)
                     current_cam.blur_regions[int(index)].append(blur_region)
         
-        print(f'Save file read from "./{path}".')
+        print(f'blurred regions read from "./{path}".')
 
         return cams
 
