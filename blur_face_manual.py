@@ -275,7 +275,7 @@ class Application:
     def read_images_at_current_frame(self, ith):
         # get first msg
         camith_connection, camith_timestamp, camith_rawdata = self.cam[ith].msg_list[self.current_frame]
-        camith_msg = self.reader.deserialize(camith_rawdata, camith_connection.msgtype)
+        camith_msg = self.typestore.deserialize_ros1(camith_rawdata, camith_connection.msgtype)
         self.cam[ith].image = self.bridge.compressed_imgmsg_to_cv2(camith_msg, desired_encoding='passthrough')
 
     def update_window(self, ith):
@@ -357,15 +357,17 @@ class Application:
             self.cam[ith].blur_regions = loaded_cam[ith].blur_regions
         
     def read_images_from_bag(self, path, cam_topics):        
-        self.reader = AnyReader([path], default_typestore=self.typestore)
-        self.cam = [Cam() for _ in range(len(cam_topics))]
-        with self.reader as reader:
-            for ith, cam_topic in enumerate(cam_topics):
-                for connection in reader.connections:
-                    if connection.topic == cam_topic:
-                        self.cam[ith].msg_list = list(reader.messages(connections=[connection]))
-                        self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
+        reader = AnyReader([path], default_typestore=self.typestore)
+        reader.open()
 
+        self.cam = [Cam() for _ in range(len(cam_topics))]
+        for ith, cam_topic in enumerate(cam_topics):
+            for connection in reader.connections:
+                if connection.topic == cam_topic:
+                    self.cam[ith].msg_list = list(reader.messages(connections=[connection]))
+                    self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
+
+        reader.close()
     def run(self):
         while True:
             key = cv2.waitKey(1)
