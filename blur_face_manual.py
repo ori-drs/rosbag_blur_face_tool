@@ -329,11 +329,17 @@ class Application:
     def read_images_at_current_frame(self, ith):
         self.cam[ith].image = self.get_image_at_frame(ith, self.current_frame)
 
-    def increase_frame(self):
-        self.current_frame += 1
+    def increase_frame(self, num):
+        self.current_frame = min(len(self.cam[0].msg_list) - 1, self.current_frame + num)
+        for ith in range(3):
+            self.read_images_at_current_frame(ith)
+            self.render_window(ith)
 
-    def decrease_frame(self):
-        self.current_frame = max(0, self.current_frame - 1)
+    def decrease_frame(self, num):
+        self.current_frame = max(0, self.current_frame - num)
+        for ith in range(3):
+            self.read_images_at_current_frame(ith)
+            self.render_window(ith)
     
     def render_window(self, ith):
         # get base image
@@ -451,55 +457,72 @@ class Application:
                 elif self.other_topics_action == Action.FILTER:
                     pass
 
+    def write_data_to_bag(self):
+        new_path = Path(self.output_bag_name)
+                
+        writer = self.create_writer(new_path)
+        reader = self.create_reader(self.input_bag_path)
+        if writer and reader:
+            writer.open()
+            reader.open()
+
+            self.write_images_to_bag(writer)
+            self.write_other_topics_to_bag(reader, writer)
+            
+            writer.close()
+            reader.close()
+            print(f'Bag file written to {writer.path}')
+        else:
+            return
+
+    def confirm_and_increase_frame(self):
+        added_region = False
+        for ith in range(3):
+            if self.cam[ith].mouse_in_window and self.cam[ith].last_region:
+                blur_region = BlurRegion()
+                blur_region.set_region(self.cam[ith].mouse_x - self.cam[ith].last_region.width,
+                                        self.cam[ith].mouse_y - self.cam[ith].last_region.height,
+                                        self.cam[ith].mouse_x,
+                                        self.cam[ith].mouse_y)
+                self.cam[ith].blur_regions[self.current_frame].append(blur_region)
+                added_region = True
+        if added_region:
+            self.increase_frame(1)
+
     def run(self):
         while True:
             key = cv2.waitKey(1)
-            if key == ord('q'):
-                break
-            elif key == 81:  # Left arrow key
-                self.decrease_frame()
-                for ith in range(3):
-                    self.read_images_at_current_frame(ith)
-                    self.render_window(ith)
-            elif key == 83:  # Right arrow key
-                self.increase_frame()
-                for ith in range(3):
-                    self.read_images_at_current_frame(ith)
-                    self.render_window(ith)
+            if key == ord('z'):
+                self.decrease_frame(10)
+            elif key == ord('a'):
+                self.decrease_frame(1)
             elif key == ord('s'):
+                self.confirm_and_increase_frame()
+            elif key == ord('x'):
+                self.delete_region_under_cursor()
+            elif key == ord('d'):
+                self.increase_frame(1)
+            elif key == ord('c'):
+                self.increase_frame(10)
+            elif key == ord('q'):
+                break
+            elif key == ord('w'):
+                self.write_data_to_bag()
+            elif key == ord('e'):
                 self.save_regions_to_file(self.save_name)
-            elif key == ord('l'):
+            elif key == ord('r'):
                 self.load_regions_from_file(self.save_name)
                 for ith in range(3):
                     self.render_window(ith)
-            elif key == ord('b'):
+            elif key == ord('f'):
                 if self.render_type == DisplayType.BLURRED:
                     self.render_type = DisplayType.PREBLUR
                 else:
                     self.render_type = DisplayType.BLURRED
                 for ith in range(3):
                     self.render_window(ith)
-            elif key == ord('p'):
-                self.render_type = DisplayType.PREBLUR
-                for ith in range(3):
-                    self.render_window(ith)
-            elif key == ord('w'):
-                new_path = Path(self.output_bag_name)
-                
-                writer = self.create_writer(new_path)
-                reader = self.create_reader(self.input_bag_path)
-                if writer and reader:
-                    writer.open()
-                    reader.open()
-
-                    self.write_images_to_bag(writer)
-                    self.write_other_topics_to_bag(reader, writer)
-                    
-                    writer.close()
-                    reader.close()
-                    print(f'Bag file written to {writer.path}')
-                else:
-                    continue
+            else:
+                pass
 
         cv2.destroyAllWindows()
 
