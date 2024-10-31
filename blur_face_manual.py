@@ -30,6 +30,7 @@ class BorderShape(Enum):
 
 class BlurRegion:
     def __init__(self):
+        self.shape = BorderShape.ELLIPSE
         pass
 
     def set_region(self, start_x, start_y, end_x, end_y):
@@ -82,27 +83,27 @@ class BlurRegion:
     def draw_ellipse(self, image, color = (0, 0, 255), thickness = 2):
         cv2.ellipse(image, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, color, thickness = thickness)
 
-    def draw_border(self, image, color = (0, 0, 255), thickness = 2, shape = BorderShape.ELLIPSE):
-        if shape == BorderShape.RECTANGLE:
+    def draw_border(self, image, color = (0, 0, 255), thickness = 2):
+        if self.shape == BorderShape.RECTANGLE:
             self.draw_rectangle(image, color, thickness)
-        elif shape == BorderShape.ELLIPSE:
+        elif self.shape == BorderShape.ELLIPSE:
             self.draw_ellipse(image, color, thickness)
-        elif shape == BorderShape.BOTH:
+        elif self.shape == BorderShape.BOTH:
             self.draw_rectangle(image, color, thickness)
             self.draw_ellipse(image, color, thickness)
 
-    def draw_border_with_crosshair(self, image, color = (0, 0, 255), thickness = 2, shape = BorderShape.ELLIPSE):
-        self.draw_border(image, color, thickness, shape)
+    def draw_border_with_crosshair(self, image, color = (0, 0, 255), thickness = 2):
+        self.draw_border(image, color, thickness)
         crosshair_x = (self.start_x + self.end_x) // 2
         crosshair_y = (self.start_y + self.end_y) // 2
         draw_crosshair(image, (crosshair_x, crosshair_y))
     
     def blur_region(self, image, shape = BorderShape.ELLIPSE):
-        if shape == BorderShape.RECTANGLE:
+        if self.shape == BorderShape.RECTANGLE:
             region = image[self.start_y:self.end_y, self.start_x:self.end_x]
             average_color = region.mean(axis=(0, 1), dtype=int)
             image[self.start_y:self.end_y, self.start_x:self.end_x] = average_color
-        elif shape == BorderShape.ELLIPSE or self.shape == BorderShape.BOTH:
+        elif self.shape == BorderShape.ELLIPSE or self.shape == BorderShape.BOTH:
             mask = np.zeros(image.shape[:2], dtype=np.uint8)  # Create a single-channel mask
             cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
             average_color = cv2.mean(image, mask=mask)[:3]
