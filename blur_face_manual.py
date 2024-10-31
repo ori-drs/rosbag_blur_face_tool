@@ -473,7 +473,10 @@ class Application:
                 for ith in range(3):
                     self.render_window(ith)
             elif key == ord('b'):
-                self.render_type = DisplayType.BLURRED
+                if self.render_type == DisplayType.BLURRED:
+                    self.render_type = DisplayType.PREBLUR
+                else:
+                    self.render_type = DisplayType.BLURRED
                 for ith in range(3):
                     self.render_window(ith)
             elif key == ord('p'):
