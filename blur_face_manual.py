@@ -31,6 +31,9 @@ class BlurRegion:
         self.end_x = end_x
         self.end_y = end_y
 
+        self.width = abs(self.end_x - self.start_x)
+        self.height = abs(self.end_y - self.start_y)
+
     def contains(self, x, y):
         return self.start_x <= x <= self.end_x and self.start_y <= y <= self.end_y
     
@@ -72,9 +75,7 @@ class Cam:
         self.moved_enoughed_distance = False
 
         # previous region
-        self.have_previous_region = False
-        self.previous_width = 0
-        self.previous_height = 0
+        self.last_region = None
     
     def __str__(self):
         string = ''
@@ -241,16 +242,14 @@ class Application:
                 blur_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
                 self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
-                # save width and height
-                self.cam[ith].previous_width = abs(self.cam[ith].drag_end_x - self.cam[ith].drag_start_x)
-                self.cam[ith].previous_height = abs(self.cam[ith].drag_end_y - self.cam[ith].drag_start_y)
-                self.cam[ith].have_previous_region = True
+                # save previous region
+                self.cam[ith].last_region = blur_region
             else:
                 # add blur region from saved width and height
-                if self.cam[ith].have_previous_region:
+                if self.cam[ith].last_region:
                     blur_region = BlurRegion()
-                    blur_region.set_region( x - self.cam[ith].previous_width,
-                                            y - self.cam[ith].previous_height, 
+                    blur_region.set_region( x - self.cam[ith].last_region.width,
+                                            y - self.cam[ith].last_region.height,
                                             x,
                                             y)
                     self.cam[ith].blur_regions[self.current_frame].append(blur_region)
@@ -293,57 +292,55 @@ class Application:
 
     def decrease_frame(self):
         self.current_frame = max(0, self.current_frame - 1)
-
-    def draw_crosshair(self, ith):
+    
+    def draw_crosshair(self, image, mouse_location):
         # Draw horizontal and vertical lines to create the crosshair
         line_length = 20
-        color = (0, 0, 255)  # Red color for the crosshair
-        thickness = 2
-        
-        # Overlay a crosshair at the mouse position
-        if self.cam[ith].mouse_x != -1 and self.cam[ith].mouse_y != -1:
-            cv2.line(self.cam[ith].display_image, (self.cam[ith].mouse_x - line_length, self.cam[ith].mouse_y), (self.cam[ith].mouse_x + line_length, self.cam[ith].mouse_y), color, thickness)
-            cv2.line(self.cam[ith].display_image, (self.cam[ith].mouse_x, self.cam[ith].mouse_y - line_length), (self.cam[ith].mouse_x, self.cam[ith].mouse_y + line_length), color, thickness)
-
-    def draw_crosshair_or_previous_region_at_mouse_location(self, image, ith):
-        # Draw horizontal and vertical lines to create the crosshair
-        line_length = 20
-        color = (0, 0, 255)  # Red color for the crosshair
+        color = (0, 0, 255)
         thickness = 2
 
-        if self.cam[ith].mouse_x != -1 and self.cam[ith].mouse_y != -1:
-            if self.cam[ith].have_previous_region:
-                cv2.rectangle(image, 
-                              (self.cam[ith].mouse_x - self.cam[ith].previous_width, 
-                               self.cam[ith].mouse_y - self.cam[ith].previous_height),
-                              (self.cam[ith].mouse_x,
-                               self.cam[ith].mouse_y),
-                              color, thickness)
-            else :
-                cv2.line(image, (self.cam[ith].mouse_x - line_length, self.cam[ith].mouse_y), (self.cam[ith].mouse_x + line_length, self.cam[ith].mouse_y), color, thickness)
-                cv2.line(image, (self.cam[ith].mouse_x, self.cam[ith].mouse_y - line_length), (self.cam[ith].mouse_x, self.cam[ith].mouse_y + line_length), color, thickness)
-        
+        if mouse_location[0] != -1 and mouse_location[1] != -1:
+            cv2.line(image, (mouse_location[0] - line_length, mouse_location[1]), (mouse_location[0] + line_length, mouse_location[1]), color, thickness)
+            cv2.line(image, (mouse_location[0], mouse_location[1] - line_length), (mouse_location[0], mouse_location[1] + line_length), color, thickness)
+
+    def draw_blur_region_at_mouse(self, image, mouse_location, blur_region):
+        cv2.rectangle(image, 
+                        (mouse_location[0] - blur_region.width, 
+                        mouse_location[1] - blur_region.height),
+                        (mouse_location[0],
+                        mouse_location[1]),
+                        (0, 0, 255), 2)
+
     def draw_live_blur_regions(self, image, ith):
             cv2.rectangle(image, (self.cam[ith].drag_start_x, self.cam[ith].drag_start_y), (self.cam[ith].drag_end_x, self.cam[ith].drag_end_y), (0, 0, 255), 2)            
 
-    def draw_blur_regions_border(self, image, region_list, ):
+    def draw_blur_regions_border(self, image, region_list):
         for region in region_list:
             region.draw_border(image, (0, 0, 255), 2)
 
-    def blur_regions(self, image, region_list):
+    def blur_image(self, image, region_list):
         for region in region_list:
             region.blur_region(image)
 
     def render_window(self, ith):
+        # get base image
         window_content = self.cam[ith].image.copy()
 
+        # draw blur regions border or blur regions
         if self.render_type == DisplayType.PREBLUR:
             self.draw_blur_regions_border(window_content, self.cam[ith].blur_regions[self.current_frame])            
         elif self.render_type == DisplayType.BLURRED:
-            self.blur_regions(window_content, self.cam[ith].blur_regions[self.current_frame])
+            self.blur_image(window_content, self.cam[ith].blur_regions[self.current_frame])
 
-        self.draw_crosshair_or_previous_region_at_mouse_location(window_content, ith)
+        # draw cursor
+        mouse_location = (self.cam[ith].mouse_x, self.cam[ith].mouse_y)
+        if mouse_location[0] != -1 and mouse_location[1] != -1:
+            if self.cam[ith].last_region:
+                self.draw_blur_region_at_mouse(window_content, mouse_location, self.cam[ith].last_region)
+            else :
+                self.draw_crosshair(window_content, mouse_location)
 
+        # draw live blur regions while dragging
         if self.cam[ith].dragging and self.cam[ith].moved_enoughed_distance:
             self.draw_live_blur_regions(window_content, ith)
         
