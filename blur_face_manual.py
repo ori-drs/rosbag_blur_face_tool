@@ -11,6 +11,7 @@ import numpy as np
 from cv_bridge import CvBridge
 # enum
 from enum import Enum
+import sys
 
 
 class Action(Enum):
@@ -151,25 +152,24 @@ def blur_image(image, region_list):
         
 class Application:
 
-    def __init__(self):
+    def __init__(self, input_bag_path):
 
         # helper objects
         self.typestore = get_typestore(Stores.ROS1_NOETIC)
         self.bridge = CvBridge()
 
+
+        cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
+        cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
+        cam2_topic = '/alphasense_driver_ros/cam2/debayered/image/compressed'
+        cam_topics = [cam0_topic, cam1_topic, cam2_topic]
         self.passthrough_topics = [
             '/alphasense_driver_ros/imu',
             '/hesai/pandar'
         ]
 
         # read images from bag
-        bag = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
-        bag2 = Path('new.bag')
-        self.input_bag_path = bag
-        cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
-        cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
-        cam2_topic = '/alphasense_driver_ros/cam2/debayered/image/compressed'
-        cam_topics = [cam0_topic, cam1_topic, cam2_topic]
+        self.input_bag_path = input_bag_path
 
         reader = self.create_reader(self.input_bag_path)
         if reader:
@@ -376,7 +376,7 @@ class Application:
             reader = AnyReader([path], default_typestore=self.typestore)
             return reader
         except AnyReaderError as e:
-            print(f'Cannot open the bag file "{path}".')
+            print(f'Cannot open bag file "{path}".')
             return None
         except Exception as e:
             print('An error occurred while opening the bag file.')
@@ -489,5 +489,13 @@ class Application:
 
 
 if __name__ == '__main__':
-    app = Application()
+    
+    if len(sys.argv) == 2:
+        bag_file = Path(sys.argv[1])
+    else:
+        bag_file = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
+        print("Usage: python blur_face_manual.py <path_to_bag_file>")
+        print(f"Using default bag file {bag_file}")
+
+    app = Application(bag_file)
     app.run()
