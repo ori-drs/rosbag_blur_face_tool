@@ -331,11 +331,9 @@ class Application:
                     blur_region.set_bottom_right_corner(x, y)
                     self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
-        elif event == cv2.EVENT_RBUTTONDOWN:
-            for region in reversed(self.cam[ith].blur_regions[self.current_frame]):
-                if region.contains(self.cam[ith].mouse_x, self.cam[ith].mouse_y):
-                    self.cam[ith].blur_regions[self.current_frame].remove(region)
-                    break
+        elif event == cv2.EVENT_MBUTTONDOWN:
+            self.erase_region_under_crosshair()
+
         self.render_window(ith)
 
     def create_window(self):
@@ -538,11 +536,18 @@ class Application:
         if added_region:
             self.increase_frame(1)
 
-    def delete_region_under_cursor(self):
+    def erase_region_under_crosshair(self):
         for ith in range(3):
             if self.cam[ith].mouse_in_window:
+                x = self.cam[ith].mouse_x
+                y = self.cam[ith].mouse_y
+
+                if self.cam[ith].last_region:
+                    x -= self.cam[ith].last_region.width // 2
+                    y -= self.cam[ith].last_region.height // 2
+                
                 for region in reversed(self.cam[ith].blur_regions[self.current_frame]):
-                    if region.contains(self.cam[ith].mouse_x, self.cam[ith].mouse_y):
+                    if region.contains(x, y):
                         self.cam[ith].blur_regions[self.current_frame].remove(region)
                         self.render_window(ith)
                         break
@@ -557,7 +562,7 @@ class Application:
             elif key == ord('s'):
                 self.confirm_and_increase_frame()
             elif key == ord('x'):
-                self.delete_region_under_cursor()
+                self.erase_region_under_crosshair()
             elif key == ord('d'):
                 self.increase_frame(1)
             elif key == ord('c'):
