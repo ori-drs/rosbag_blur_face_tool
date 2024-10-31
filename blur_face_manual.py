@@ -263,10 +263,7 @@ class Application:
         self.register_callbacks()
 
         for ith in range(3):
-            self.initialize_blur_regions(ith)
-            self.read_images_at_current_frame(ith)
             self.render_window(ith)
-
 
     def process_image(self, input_image):
         return cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
@@ -278,9 +275,6 @@ class Application:
             format='jpg',
             data=np.frombuffer(compressed_image, dtype=np.uint8),
         )
-
-    def initialize_blur_regions(self, ith):
-        self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
 
     def process_passthrough_and_other_topics(self):
         # process passthrough topics and other topics
@@ -386,24 +380,19 @@ class Application:
         camith_msg = self.typestore.deserialize_ros1(camith_rawdata, camith_connection.msgtype)
         return self.bridge.compressed_imgmsg_to_cv2(camith_msg, desired_encoding='passthrough')
 
-    def read_images_at_current_frame(self, ith):
-        self.cam[ith].image = self.get_image_at_frame(ith, self.current_frame)
-
     def increase_frame(self, num):
         self.current_frame = min(len(self.cam[0].msg_list) - 1, self.current_frame + num)
         for ith in range(3):
-            self.read_images_at_current_frame(ith)
             self.render_window(ith)
 
     def decrease_frame(self, num):
         self.current_frame = max(0, self.current_frame - num)
         for ith in range(3):
-            self.read_images_at_current_frame(ith)
             self.render_window(ith)
     
     def render_window(self, ith):
         # get base image
-        window_content = self.cam[ith].image.copy()
+        window_content = self.get_image_at_frame(ith, self.current_frame)
 
         # draw blur regions border or blur regions
         if self.render_type == DisplayType.PREBLUR:
