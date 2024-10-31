@@ -527,7 +527,7 @@ class Application:
                 self.load_regions_from_file(self.save_name)
                 for ith in range(3):
                     self.render_window(ith)
-            elif key == ord('f'):
+            elif key == ord('b'):
                 if self.render_type == DisplayType.BLURRED:
                     self.render_type = DisplayType.PREBLUR
                 else:
