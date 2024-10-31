@@ -17,6 +17,10 @@ class Action(Enum):
     PASSTHROUGH = 1
     FILTER = 2
 
+class DisplayType(Enum):
+    PREBLUR = 1
+    BLURRED = 2
+
 class BlurRegion:
     def __init__(self):
         pass
@@ -32,6 +36,11 @@ class BlurRegion:
     
     def draw_border(self, image, color, thickness):
         cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
+    
+    def blur_region(self, image):
+        region = image[self.start_y:self.end_y, self.start_x:self.end_x]
+        average_color = region.mean(axis=(0, 1), dtype=int)
+        image[self.start_y:self.end_y, self.start_x:self.end_x] = average_color
     
     def __str__(self):
         return f'{self.start_x} {self.start_y} {self.end_x} {self.end_y}'
@@ -146,6 +155,7 @@ class Application:
         self.current_frame = 0
         self.threashold_distance = 30
         
+        self.render_type = DisplayType.PREBLUR
 
         # # process passthrough topics and other topics
         # self.process_passthrough_and_other_topics()
@@ -157,8 +167,7 @@ class Application:
         for ith in range(3):
             self.initialize_blur_regions(ith)
             self.read_images_at_current_frame(ith)
-            self.generate_display_image(ith)
-            self.update_window(ith)
+            self.render_window(ith)
 
 
     def process_image(self, input_image):
@@ -248,8 +257,7 @@ class Application:
 
             self.cam[ith].dragging = False
         
-        self.generate_display_image(ith)
-        self.update_window(ith)
+        self.render_window(ith)
 
     def create_window(self):
         # display windows
@@ -272,23 +280,19 @@ class Application:
         cv2.setMouseCallback('cam1', self.mouse_callback, param=1)
         cv2.setMouseCallback('cam2', self.mouse_callback, param=2)
 
-    def read_images_at_current_frame(self, ith):
-        # get first msg
-        camith_connection, camith_timestamp, camith_rawdata = self.cam[ith].msg_list[self.current_frame]
+    def get_image_at_frame(self, ith, frame):
+        camith_connection, camith_timestamp, camith_rawdata = self.cam[ith].msg_list[frame]
         camith_msg = self.typestore.deserialize_ros1(camith_rawdata, camith_connection.msgtype)
-        self.cam[ith].image = self.bridge.compressed_imgmsg_to_cv2(camith_msg, desired_encoding='passthrough')
+        return self.bridge.compressed_imgmsg_to_cv2(camith_msg, desired_encoding='passthrough')
 
-    def update_window(self, ith):
-        cv2.imshow('cam'+str(ith), self.cam[ith].display_image)
+    def read_images_at_current_frame(self, ith):
+        self.cam[ith].image = self.get_image_at_frame(ith, self.current_frame)
 
     def increase_frame(self):
         self.current_frame += 1
 
     def decrease_frame(self):
         self.current_frame = max(0, self.current_frame - 1)
-
-    def reset_display_image(self, ith):
-        self.cam[ith].display_image = self.cam[ith].image.copy()
 
     def draw_crosshair(self, ith):
         # Draw horizontal and vertical lines to create the crosshair
@@ -301,7 +305,7 @@ class Application:
             cv2.line(self.cam[ith].display_image, (self.cam[ith].mouse_x - line_length, self.cam[ith].mouse_y), (self.cam[ith].mouse_x + line_length, self.cam[ith].mouse_y), color, thickness)
             cv2.line(self.cam[ith].display_image, (self.cam[ith].mouse_x, self.cam[ith].mouse_y - line_length), (self.cam[ith].mouse_x, self.cam[ith].mouse_y + line_length), color, thickness)
 
-    def draw_crosshair_or_previous_region(self, ith):
+    def draw_crosshair_or_previous_region_at_mouse_location(self, image, ith):
         # Draw horizontal and vertical lines to create the crosshair
         line_length = 20
         color = (0, 0, 255)  # Red color for the crosshair
@@ -309,42 +313,42 @@ class Application:
 
         if self.cam[ith].mouse_x != -1 and self.cam[ith].mouse_y != -1:
             if self.cam[ith].have_previous_region:
-                cv2.rectangle(self.cam[ith].display_image, 
+                cv2.rectangle(image, 
                               (self.cam[ith].mouse_x - self.cam[ith].previous_width, 
                                self.cam[ith].mouse_y - self.cam[ith].previous_height),
                               (self.cam[ith].mouse_x,
                                self.cam[ith].mouse_y),
                               color, thickness)
             else :
-                cv2.line(self.cam[ith].display_image, (self.cam[ith].mouse_x - line_length, self.cam[ith].mouse_y), (self.cam[ith].mouse_x + line_length, self.cam[ith].mouse_y), color, thickness)
-                cv2.line(self.cam[ith].display_image, (self.cam[ith].mouse_x, self.cam[ith].mouse_y - line_length), (self.cam[ith].mouse_x, self.cam[ith].mouse_y + line_length), color, thickness)
+                cv2.line(image, (self.cam[ith].mouse_x - line_length, self.cam[ith].mouse_y), (self.cam[ith].mouse_x + line_length, self.cam[ith].mouse_y), color, thickness)
+                cv2.line(image, (self.cam[ith].mouse_x, self.cam[ith].mouse_y - line_length), (self.cam[ith].mouse_x, self.cam[ith].mouse_y + line_length), color, thickness)
         
-    def draw_blur_regions_border(self, ith):
-        for region in self.cam[ith].blur_regions[self.current_frame]:
-            region.draw_border(self.cam[ith].display_image, (0, 0, 255), 2)
+    def draw_live_blur_regions(self, image, ith):
+            cv2.rectangle(image, (self.cam[ith].drag_start_x, self.cam[ith].drag_start_y), (self.cam[ith].drag_end_x, self.cam[ith].drag_end_y), (0, 0, 255), 2)            
 
-    def draw_live_blur_regions(self, ith):
+    def draw_blur_regions_border(self, image, region_list, ):
+        for region in region_list:
+            region.draw_border(image, (0, 0, 255), 2)
+
+    def blur_regions(self, image, region_list):
+        for region in region_list:
+            region.blur_region(image)
+
+    def render_window(self, ith):
+        window_content = self.cam[ith].image.copy()
+
+        if self.render_type == DisplayType.PREBLUR:
+            self.draw_blur_regions_border(window_content, self.cam[ith].blur_regions[self.current_frame])            
+        elif self.render_type == DisplayType.BLURRED:
+            self.blur_regions(window_content, self.cam[ith].blur_regions[self.current_frame])
+
+        self.draw_crosshair_or_previous_region_at_mouse_location(window_content, ith)
+
         if self.cam[ith].dragging and self.cam[ith].moved_enoughed_distance:
-            cv2.rectangle(self.cam[ith].display_image, (self.cam[ith].drag_start_x, self.cam[ith].drag_start_y), (self.cam[ith].drag_end_x, self.cam[ith].drag_end_y), (0, 0, 255), 2)            
-
-    def generate_display_image(self, ith):
-        self.reset_display_image(ith)
-        self.draw_crosshair_or_previous_region(ith)
-        self.draw_blur_regions_border(ith)
-        self.draw_live_blur_regions(ith)
-
-    # def write_images_to_bag(self):
-    #     # modify the image to gray
-    #     output_image = self.process_image(input_image)
+            self.draw_live_blur_regions(window_content, ith)
         
-    #     # compress image
-    #     output_msg = self.image_to_compressed_msg(output_image, input_msg.header)
-
-    #     # write to new bag
-    #     new_connection = self.writer.add_connection(connection.topic, message_type, msgdef=connection.msgdef, typestore=self.typestore)
-    #     new_rawdata = self.typestore.serialize_ros1(output_msg, message_type)
-    #     new_timestamp = timestamp
-    #     self.writer.write(new_connection, new_timestamp, new_rawdata)
+        # update window
+        cv2.imshow('cam'+str(ith), window_content)
 
     def save_regions_to_file(self, path):
         save_file_handler = SaveFileHandler()
@@ -368,6 +372,54 @@ class Application:
                     self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
 
         reader.close()
+
+    # def write_images_to_bag(self, path):
+        
+
+    #     for ith, cam in enumerate(self.cam):
+    #         for frame, (connection, timestamp, rawdata) in enumerate(cam.msg_list):
+    #             image = self.bridge.compressed_imgmsg_to_cv2(self.reader.deserialize(rawdata, connection.msgtype), desired_encoding='passthrough')
+    #             for region in cam.blur_regions[frame]:
+    #                 start_x, start_y, end_x, end_y = region.start_x, region.start_y, region.end_x, region.end_y
+    #                 image[start_y:end_y, start_x:end_x] = cv2.GaussianBlur(image[start_y:end_y, start_x:end_x], (25, 25), 0)
+    #             compressed_image = self.bridge.cv2_to_compressed_imgmsg(image)
+    #             writer.write(connection, timestamp, self.typestore.serialize_ros1(compressed_image, connection.msgtype))
+
+        
+
+    # def write_images_to_bag(self):
+    #     writer = Writer(path)
+    #     writer.open()
+
+    #     # write for each cam
+    #     for cam in self.cam:
+    #         connection, _, _ = cam.msg_list[0]
+    #         writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=self.typestore)  
+
+    #         # write for each frame
+    #         for frame, (connection, timestamp, rawdata) in enumerate(cam.msg_list):
+    #             image = self.bridge.compressed_imgmsg_to_cv2(self.reader.deserialize(rawdata, connection.msgtype), desired_encoding='passthrough')
+    #             for region in cam.blur_regions[frame]:
+    #                 start_x, start_y, end_x, end_y = region.start_x, region.start_y, region.end_x, region.end_y
+    #                 image[start_y:end_y, start_x:end_x] = cv2.GaussianBlur(image[start_y:end_y, start_x:end_x], (25, 25), 0)
+    #             compressed_image = self.bridge.cv2_to_compressed_imgmsg(image)
+    #             writer.write(connection, timestamp, self.typestore.serialize_ros1(compressed_image, connection.msgtype))
+
+    #     # modify the image to gray
+    #     output_image = self.process_image(input_image)
+        
+    #     # compress image
+    #     output_msg = self.image_to_compressed_msg(output_image, input_msg.header)
+
+    #     # write to new bag
+    #     new_connection = self.writer.add_connection(connection.topic, message_type, msgdef=connection.msgdef, typestore=self.typestore)
+    #     new_rawdata = self.typestore.serialize_ros1(output_msg, message_type)
+    #     new_timestamp = timestamp
+    #     self.writer.write(new_connection, new_timestamp, new_rawdata)
+
+    #     writer.close()
+
+
     def run(self):
         while True:
             key = cv2.waitKey(1)
@@ -377,21 +429,29 @@ class Application:
                 self.decrease_frame()
                 for ith in range(3):
                     self.read_images_at_current_frame(ith)
-                    self.generate_display_image(ith)
-                    self.update_window(ith)
+                    self.render_window(ith)
             elif key == 83:  # Right arrow key
                 self.increase_frame()
                 for ith in range(3):
                     self.read_images_at_current_frame(ith)
-                    self.generate_display_image(ith)
-                    self.update_window(ith)
+                    self.render_window(ith)
             elif key == ord('s'):
                 self.save_regions_to_file('save.txt')
             elif key == ord('l'):
                 self.load_regions_from_file('save.txt')
                 for ith in range(3):
-                    self.generate_display_image(ith)
-                    self.update_window(ith)
+                    self.render_window(ith)
+            elif key == ord('b'):
+                self.render_type = DisplayType.BLURRED
+                for ith in range(3):
+                    self.render_window(ith)
+            elif key == ord('p'):
+                self.render_type = DisplayType.PREBLUR
+                for ith in range(3):
+                    self.render_window(ith)
+            elif key == ord('w'):
+                path = Path('new.bag')
+                self.write_images_to_bag(path)
             else:
                 continue
 
