@@ -74,6 +74,7 @@ class Cam:
         # mouse position
         self.mouse_x = -1
         self.mouse_y = -1
+        self.mouse_in_window = False
 
         # dragging
         self.dragging = False
@@ -247,6 +248,13 @@ class Application:
     
     # Mouse event callback function to update mouse position
     def mouse_callback(self, event, x, y, flags, ith):
+        # remove cursor from other windows
+        for i in range(3):
+            if self.cam[i].mouse_in_window:
+                self.cam[i].mouse_in_window = False
+                self.render_window(i)
+        self.cam[ith].mouse_in_window = True
+        
         if event == cv2.EVENT_LBUTTONDOWN:
             self.cam[ith].dragging = True
 
@@ -341,7 +349,7 @@ class Application:
 
         # draw cursor
         mouse_location = (self.cam[ith].mouse_x, self.cam[ith].mouse_y)
-        if mouse_location[0] != -1 and mouse_location[1] != -1:
+        if self.cam[ith].mouse_in_window:
             if self.cam[ith].last_region:
                 self.cam[ith].last_region.draw_border_offset(window_content, mouse_location, (0, 0, 255), 2)
             else :
