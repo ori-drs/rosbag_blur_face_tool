@@ -2,7 +2,7 @@
 from pathlib import Path
 # rosbags
 from rosbags.highlevel import AnyReader
-from rosbags.rosbag1 import Writer
+from rosbags.rosbag1 import Writer, WriterError
 from rosbags.typesys import get_typestore, Stores
 from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage as CompressedImage
 # opencv
@@ -157,10 +157,6 @@ class Application:
         self.typestore = get_typestore(Stores.ROS1_NOETIC)
         self.bridge = CvBridge()
 
-        # output bag
-        writer_bag_path = Path('new.bag')
-        # self.setup_writer(writer_bag_path)
-
         self.passthrough_topics = [
             '/alphasense_driver_ros/imu',
             '/hesai/pandar'
@@ -168,6 +164,7 @@ class Application:
 
         # read images from bag
         bag = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
+        bag2 = Path('new.bag')
         cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
         cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
         cam2_topic = '/alphasense_driver_ros/cam2/debayered/image/compressed'
@@ -368,52 +365,45 @@ class Application:
 
         reader.close()
 
-    # def write_images_to_bag(self, path):
+    def write_images_to_bag(self, path):
+        # create bag file
+        try:
+            writer = Writer(path)
+        except WriterError as e:
+            print('Bag already exists, please rename or delete the existing bag and try again.')
+            return
+        except Exception as e:
+            print('An error occurred while opening the bag file.')
+            return
+        writer.open()
+
+        # for each camera
+        for ith, cam in enumerate(self.cam):
+            input_connection, _, _ = cam.msg_list[0]
+            output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)  
+
+            # write for each frame
+            for frame in range(len(cam.msg_list)):
+                print (f'Writing frame {frame} for cam {ith}')
+                input_connection, input_timestamp, input_rawdata = cam.msg_list[frame]
+
+                # check if new blur regions are added
+                if cam.blur_regions[frame]:
+                    input_msg = self.typestore.deserialize_ros1(input_rawdata, input_connection.msgtype)
+                    input_image = self.bridge.compressed_imgmsg_to_cv2(input_msg, desired_encoding='passthrough')
+
+                    output_image = input_image.copy()
+                    blur_image(output_image, cam.blur_regions[frame])
+
+                    output_timestamp = input_timestamp
+                    output_msg = self.image_to_compressed_msg(output_image, input_msg.header)
+                    output_rawdata = self.typestore.serialize_ros1(output_msg, input_connection.msgtype)
+                    writer.write(output_connection, output_timestamp, output_rawdata)
+                else:
+                    writer.write(output_connection, input_timestamp, input_rawdata)
         
-
-    #     for ith, cam in enumerate(self.cam):
-    #         for frame, (connection, timestamp, rawdata) in enumerate(cam.msg_list):
-    #             image = self.bridge.compressed_imgmsg_to_cv2(self.reader.deserialize(rawdata, connection.msgtype), desired_encoding='passthrough')
-    #             for region in cam.blur_regions[frame]:
-    #                 start_x, start_y, end_x, end_y = region.start_x, region.start_y, region.end_x, region.end_y
-    #                 image[start_y:end_y, start_x:end_x] = cv2.GaussianBlur(image[start_y:end_y, start_x:end_x], (25, 25), 0)
-    #             compressed_image = self.bridge.cv2_to_compressed_imgmsg(image)
-    #             writer.write(connection, timestamp, self.typestore.serialize_ros1(compressed_image, connection.msgtype))
-
-        
-
-    # def write_images_to_bag(self):
-    #     writer = Writer(path)
-    #     writer.open()
-
-    #     # write for each cam
-    #     for cam in self.cam:
-    #         connection, _, _ = cam.msg_list[0]
-    #         writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=self.typestore)  
-
-    #         # write for each frame
-    #         for frame, (connection, timestamp, rawdata) in enumerate(cam.msg_list):
-    #             image = self.bridge.compressed_imgmsg_to_cv2(self.reader.deserialize(rawdata, connection.msgtype), desired_encoding='passthrough')
-    #             for region in cam.blur_regions[frame]:
-    #                 start_x, start_y, end_x, end_y = region.start_x, region.start_y, region.end_x, region.end_y
-    #                 image[start_y:end_y, start_x:end_x] = cv2.GaussianBlur(image[start_y:end_y, start_x:end_x], (25, 25), 0)
-    #             compressed_image = self.bridge.cv2_to_compressed_imgmsg(image)
-    #             writer.write(connection, timestamp, self.typestore.serialize_ros1(compressed_image, connection.msgtype))
-
-    #     # modify the image to gray
-    #     output_image = self.process_image(input_image)
-        
-    #     # compress image
-    #     output_msg = self.image_to_compressed_msg(output_image, input_msg.header)
-
-    #     # write to new bag
-    #     new_connection = self.writer.add_connection(connection.topic, message_type, msgdef=connection.msgdef, typestore=self.typestore)
-    #     new_rawdata = self.typestore.serialize_ros1(output_msg, message_type)
-    #     new_timestamp = timestamp
-    #     self.writer.write(new_connection, new_timestamp, new_rawdata)
-
-    #     writer.close()
-
+        writer.close()
+        print(f'Bag file written to {path}')
 
     def run(self):
         while True:
