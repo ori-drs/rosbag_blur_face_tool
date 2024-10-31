@@ -381,13 +381,17 @@ class Application:
     def increase_frame(self, num):
         for ith in range(3):
             self.current_frame[ith] = min(len(self.cam[ith].msg_list) - 1, self.current_frame[ith] + num)
-            self.render_window(ith)
+        self.render_windows()
 
     def decrease_frame(self, num):
         for ith in range(3):
             self.current_frame[ith] = max(0, self.current_frame[ith] - num)
-            self.render_window(ith)
+        self.render_windows()
     
+    def render_windows(self):
+        for ith in range(3):
+            self.render_window(ith)
+
     def render_window(self, ith):
         # get base image
         window_content = self.get_image_at_frame(ith, self.current_frame[ith])
@@ -564,6 +568,10 @@ class Application:
                         self.cam[ith].blur_regions[self.current_frame[ith]].remove(region)
                         self.render_window(ith)
                         break
+    
+    def set_current_frame_as_ratio(self, ratio):
+        for ith in range(3):
+            self.current_frame[ith] = max(0, int(ratio * len(self.cam[ith].msg_list)) - 1)
 
     def run(self):
         while True:
@@ -588,19 +596,50 @@ class Application:
                 self.write_regions_to_file(self.save_name)
             elif key == ord('r'):
                 self.read_regions_from_file(self.save_name)
-                for ith in range(3):
-                    self.render_window(ith)
+                self.render_windows()
             elif key == ord('b'):
                 if self.render_type == DisplayType.BLURRED:
                     self.render_type = DisplayType.PREBLUR
                 else:
                     self.render_type = DisplayType.BLURRED
-                for ith in range(3):
-                    self.render_window(ith)
+                self.render_windows()
             elif key == ord('f'):
                 self.increase_region_size()
             elif key == ord('v'):
                 self.decrease_region_size()
+            elif key == ord('1'):
+                self.set_current_frame_as_ratio(0.1)
+                self.render_windows()
+            elif key == ord('2'):
+                self.set_current_frame_as_ratio(0.2)
+                self.render_windows()
+            elif key == ord('3'):
+                self.set_current_frame_as_ratio(0.3)
+                self.render_windows()
+            elif key == ord('4'):
+                self.set_current_frame_as_ratio(0.4)
+                self.render_windows()
+            elif key == ord('5'):
+                self.set_current_frame_as_ratio(0.5)
+                self.render_windows()
+            elif key == ord('6'):
+                self.set_current_frame_as_ratio(0.6)
+                self.render_windows()
+            elif key == ord('7'):
+                self.set_current_frame_as_ratio(0.7)
+                self.render_windows()
+            elif key == ord('8'):
+                self.set_current_frame_as_ratio(0.8)
+                self.render_windows()
+            elif key == ord('9'):
+                self.set_current_frame_as_ratio(0.9)
+                self.render_windows()
+            elif key == ord('0'):
+                self.set_current_frame_as_ratio(1.0)
+                self.render_windows()
+            elif key == ord('o'):
+                self.set_current_frame_as_ratio(0.0)
+                self.render_windows()
             else:
                 pass
 
