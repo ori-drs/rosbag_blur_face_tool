@@ -71,16 +71,14 @@ class BlurRegion:
     def contains(self, x, y):
         return self.start_x <= x <= self.end_x and self.start_y <= y <= self.end_y
     
-    def draw_border(self, image, color, thickness):
+    def draw_border(self, image, color = (0, 0, 255), thickness = 2):
         cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
-    
-    def draw_border_offset(self, image, offset, color, thickness):
-        cv2.rectangle(image, 
-                    (offset[0] - self.width, 
-                    offset[1] - self.height),
-                    (offset[0],
-                    offset[1]),
-                    color, thickness)
+
+    def draw_border_with_crosshair(self, image, color = (0, 0, 255), thickness = 2):
+        self.draw_border(image, color, thickness)
+        crosshair_x = (self.start_x + self.end_x) // 2
+        crosshair_y = (self.start_y + self.end_y) // 2
+        draw_crosshair(image, (crosshair_x, crosshair_y))
     
     def blur_region(self, image):
         region = image[self.start_y:self.end_y, self.start_x:self.end_x]
@@ -388,7 +386,7 @@ class Application:
         # draw blur regions border or blur regions
         if self.render_type == DisplayType.PREBLUR:
             for region in self.cam[ith].blur_regions[self.current_frame]:
-                region.draw_border(window_content, (0, 0, 255), 2)
+                region.draw_border(window_content)
         elif self.render_type == DisplayType.BLURRED:
             all_regions = self.cam[ith].blur_regions[self.current_frame]
             blur_image(window_content, all_regions)
@@ -397,7 +395,9 @@ class Application:
         mouse_location = (self.cam[ith].mouse_x, self.cam[ith].mouse_y)
         if self.cam[ith].mouse_in_window & (not self.cam[ith].dragging):
             if self.cam[ith].last_region:
-                self.cam[ith].last_region.draw_border_offset(window_content, mouse_location, (0, 0, 255), 2)
+                cursor_region = copy.deepcopy(self.cam[ith].last_region)
+                cursor_region.set_bottom_right_corner(self.cam[ith].mouse_x, self.cam[ith].mouse_y)
+                cursor_region.draw_border_with_crosshair(window_content)
             else :
                 draw_crosshair(window_content, mouse_location)
 
@@ -405,7 +405,7 @@ class Application:
         if self.cam[ith].dragging and self.cam[ith].moved_enoughed_distance:
             live_region = BlurRegion()
             live_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
-            live_region.draw_border(window_content, (0, 0, 255), 2)
+            live_region.draw_border(window_content)
         
         # update window
         cv2.imshow('cam'+str(ith), window_content)
