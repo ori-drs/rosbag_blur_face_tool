@@ -354,7 +354,7 @@ class Application:
                     blur_region.set_bottom_right_corner(x, y)
                     self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
-        elif event == cv2.EVENT_MBUTTONDOWN:
+        elif event == cv2.EVENT_MBUTTONDOWN or event == cv2.EVENT_RBUTTONDOWN:
             self.erase_region_under_cursor()
 
         self.render_window(ith)
