@@ -12,6 +12,7 @@ from cv_bridge import CvBridge
 # enum
 from enum import Enum
 import sys
+import copy
 
 
 class Action(Enum):
@@ -34,6 +35,38 @@ class BlurRegion:
 
         self.width = abs(self.end_x - self.start_x)
         self.height = abs(self.end_y - self.start_y)
+
+        self.original_width = self.width
+        self.original_ratio = self.height / self.width
+        
+        self.magnification = 1
+
+    def set_bottom_right_corner(self, x, y):
+        self.end_x = x
+        self.end_y = y
+
+        self.start_x = self.end_x - self.width
+        self.start_y = self.end_y - self.height
+
+    def increase_size(self, step):
+        self.magnification += step
+
+        self.width = int(self.original_width * self.magnification)
+        self.height = int(self.original_width * self.magnification * self.original_ratio)
+
+        # update end points
+        self.end_x = self.start_x + self.width
+        self.end_y = self.start_y + self.height
+    
+    def decrease_size(self, step):
+        self.magnification = max(step, self.magnification - step)
+
+        self.width = int(self.original_width * self.magnification)
+        self.height = int(self.original_width * self.magnification * self.original_ratio)
+
+        # update end points
+        self.end_x = self.start_x + self.width
+        self.end_y = self.start_y + self.height
 
     def contains(self, x, y):
         return self.start_x <= x <= self.end_x and self.start_y <= y <= self.end_y
@@ -245,6 +278,13 @@ class Application:
                 elif self.other_topics_action == Action.FILTER:
                     pass
 
+    def check_if_move_enoughed_distance(self, start_x, start_y, end_x, end_y):
+        moved_x = (end_x - start_x)**2
+        moved_y = (end_y - start_y)**2
+        both_moved = moved_x != 0 and moved_y != 0
+        moved_enough = moved_x + moved_y > self.threashold_distance**2
+        return both_moved and moved_enough
+
     
     # Mouse event callback function to update mouse position
     def mouse_callback(self, event, x, y, flags, ith):
@@ -257,26 +297,26 @@ class Application:
         
         if event == cv2.EVENT_LBUTTONDOWN:
             self.cam[ith].dragging = True
-
             self.cam[ith].drag_start_x = x
             self.cam[ith].drag_start_y = y
             self.cam[ith].drag_end_x = x
             self.cam[ith].drag_end_y = y
 
+            self.cam[ith].moved_enoughed_distance = False
+
         elif event == cv2.EVENT_MOUSEMOVE:
+            self.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, x, y)            
             self.cam[ith].drag_end_x = x
             self.cam[ith].drag_end_y = y
-
-            if self.cam[ith].dragging:
-                self.cam[ith].moved_enoughed_distance = (self.cam[ith].drag_end_x - self.cam[ith].drag_start_x)**2 + (self.cam[ith].drag_end_y - self.cam[ith].drag_start_y)**2 > self.threashold_distance**2
 
             # position
             self.cam[ith].mouse_x, self.cam[ith].mouse_y = x, y
 
         elif event == cv2.EVENT_LBUTTONUP:
+            self.cam[ith].dragging = False
+            self.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, x, y)
             self.cam[ith].drag_end_x = x
             self.cam[ith].drag_end_y = y
-            self.cam[ith].moved_enoughed_distance = (self.cam[ith].drag_end_x - self.cam[ith].drag_start_x)**2 + (self.cam[ith].drag_end_y - self.cam[ith].drag_start_y)**2 > self.threashold_distance**2
 
             if self.cam[ith].moved_enoughed_distance:
                 # add blur region from dragged region
@@ -285,18 +325,14 @@ class Application:
                 self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
                 # save previous region
-                self.cam[ith].last_region = blur_region
+                self.cam[ith].last_region = copy.deepcopy(blur_region)
             else:
                 # add blur region from saved width and height
                 if self.cam[ith].last_region:
-                    blur_region = BlurRegion()
-                    blur_region.set_region( x - self.cam[ith].last_region.width,
-                                            y - self.cam[ith].last_region.height,
-                                            x,
-                                            y)
+                    blur_region = copy.deepcopy(self.cam[ith].last_region)
+                    blur_region.set_bottom_right_corner(x, y)
                     self.cam[ith].blur_regions[self.current_frame].append(blur_region)
 
-            self.cam[ith].dragging = False
         elif event == cv2.EVENT_RBUTTONDOWN:
             for region in reversed(self.cam[ith].blur_regions[self.current_frame]):
                 if region.contains(self.cam[ith].mouse_x, self.cam[ith].mouse_y):
@@ -479,15 +515,24 @@ class Application:
         else:
             return
 
+    def increase_region_size(self):
+        for ith in range(3):
+            if self.cam[ith].mouse_in_window and self.cam[ith].last_region:
+                self.cam[ith].last_region.increase_size(0.05)    
+                self.render_window(ith)
+    
+    def decrease_region_size(self):
+        for ith in range(3):
+            if self.cam[ith].mouse_in_window and self.cam[ith].last_region:
+                self.cam[ith].last_region.decrease_size(0.05)    
+                self.render_window(ith)
+
     def confirm_and_increase_frame(self):
         added_region = False
         for ith in range(3):
             if self.cam[ith].mouse_in_window and self.cam[ith].last_region:
-                blur_region = BlurRegion()
-                blur_region.set_region(self.cam[ith].mouse_x - self.cam[ith].last_region.width,
-                                        self.cam[ith].mouse_y - self.cam[ith].last_region.height,
-                                        self.cam[ith].mouse_x,
-                                        self.cam[ith].mouse_y)
+                blur_region = copy.deepcopy(self.cam[ith].last_region)
+                blur_region.set_bottom_right_corner(self.cam[ith].mouse_x, self.cam[ith].mouse_y)
                 self.cam[ith].blur_regions[self.current_frame].append(blur_region)
                 added_region = True
         if added_region:
@@ -534,6 +579,10 @@ class Application:
                     self.render_type = DisplayType.BLURRED
                 for ith in range(3):
                     self.render_window(ith)
+            elif key == ord('f'):
+                self.increase_region_size()
+            elif key == ord('v'):
+                self.decrease_region_size()
             else:
                 pass
 
