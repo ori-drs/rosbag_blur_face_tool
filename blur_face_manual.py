@@ -223,13 +223,6 @@ class Application:
             data=np.frombuffer(compressed_image, dtype=np.uint8),
         )
 
-    def setup_writer(self, bag_path):
-        self.writer = Writer(bag_path)
-        self.writer.open()
-
-    def close_writer(self):
-        self.writer.close()
-
     def initialize_blur_regions(self, ith):
         self.cam[ith].blur_regions = [[] for _ in range(len(self.cam[ith].msg_list))]
 
