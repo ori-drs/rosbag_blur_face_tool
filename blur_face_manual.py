@@ -349,7 +349,7 @@ class Application:
 
         # draw cursor
         mouse_location = (self.cam[ith].mouse_x, self.cam[ith].mouse_y)
-        if self.cam[ith].mouse_in_window:
+        if self.cam[ith].mouse_in_window & (not self.cam[ith].dragging):
             if self.cam[ith].last_region:
                 self.cam[ith].last_region.draw_border_offset(window_content, mouse_location, (0, 0, 255), 2)
             else :
