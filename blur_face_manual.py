@@ -249,8 +249,6 @@ class Application:
         
 
         self.other_topics_action = Action.FILTER
-
-        self.current_frame = 0
         self.threashold_distance = 30
         
         self.render_type = DisplayType.PREBLUR
@@ -338,7 +336,7 @@ class Application:
                 # add blur region from dragged region
                 blur_region = BlurRegion()
                 blur_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
-                self.cam[ith].blur_regions[self.current_frame].append(blur_region)
+                self.cam[ith].blur_regions[self.current_frame[ith]].append(blur_region)
 
                 # save previous region
                 self.cam[ith].last_region = copy.deepcopy(blur_region)
@@ -347,7 +345,7 @@ class Application:
                 if self.cam[ith].last_region:
                     blur_region = copy.deepcopy(self.cam[ith].last_region)
                     blur_region.set_bottom_right_corner(x, y)
-                    self.cam[ith].blur_regions[self.current_frame].append(blur_region)
+                    self.cam[ith].blur_regions[self.current_frame[ith]].append(blur_region)
 
         elif event == cv2.EVENT_MBUTTONDOWN or event == cv2.EVENT_RBUTTONDOWN:
             self.erase_region_under_cursor()
@@ -381,25 +379,25 @@ class Application:
         return self.bridge.compressed_imgmsg_to_cv2(camith_msg, desired_encoding='passthrough')
 
     def increase_frame(self, num):
-        self.current_frame = min(len(self.cam[0].msg_list) - 1, self.current_frame + num)
         for ith in range(3):
+            self.current_frame[ith] = min(len(self.cam[ith].msg_list) - 1, self.current_frame[ith] + num)
             self.render_window(ith)
 
     def decrease_frame(self, num):
-        self.current_frame = max(0, self.current_frame - num)
         for ith in range(3):
+            self.current_frame[ith] = max(0, self.current_frame[ith] - num)
             self.render_window(ith)
     
     def render_window(self, ith):
         # get base image
-        window_content = self.get_image_at_frame(ith, self.current_frame)
+        window_content = self.get_image_at_frame(ith, self.current_frame[ith])
 
         # draw blur regions border or blur regions
         if self.render_type == DisplayType.PREBLUR:
-            for region in self.cam[ith].blur_regions[self.current_frame]:
+            for region in self.cam[ith].blur_regions[self.current_frame[ith]]:
                 region.draw_border(window_content)
         elif self.render_type == DisplayType.BLURRED:
-            all_regions = self.cam[ith].blur_regions[self.current_frame]
+            all_regions = self.cam[ith].blur_regions[self.current_frame[ith]]
             blur_image(window_content, all_regions)
 
         # draw cursor
@@ -434,6 +432,7 @@ class Application:
         
     def read_images_from_bag(self, reader, cam_topics):     
         self.cam = [Cam() for _ in range(len(cam_topics))]
+        self.current_frame = [0 for _ in range(len(cam_topics))]
         for ith, cam_topic in enumerate(cam_topics):
             for connection in reader.connections:
                 if connection.topic == cam_topic:
@@ -544,7 +543,7 @@ class Application:
             if self.cam[ith].mouse_in_window and self.cam[ith].last_region:
                 blur_region = copy.deepcopy(self.cam[ith].last_region)
                 blur_region.set_bottom_right_corner(self.cam[ith].mouse_x, self.cam[ith].mouse_y)
-                self.cam[ith].blur_regions[self.current_frame].append(blur_region)
+                self.cam[ith].blur_regions[self.current_frame[ith]].append(blur_region)
                 added_region = True
         if added_region:
             self.increase_frame(1)
@@ -560,9 +559,9 @@ class Application:
                 #     x -= self.cam[ith].last_region.width // 2
                 #     y -= self.cam[ith].last_region.height // 2
                 
-                for region in reversed(self.cam[ith].blur_regions[self.current_frame]):
+                for region in reversed(self.cam[ith].blur_regions[self.current_frame[ith]]):
                     if region.contains(x, y):
-                        self.cam[ith].blur_regions[self.current_frame].remove(region)
+                        self.cam[ith].blur_regions[self.current_frame[ith]].remove(region)
                         self.render_window(ith)
                         break
 
