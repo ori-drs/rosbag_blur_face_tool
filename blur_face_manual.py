@@ -104,10 +104,18 @@ class BlurRegion:
             average_color = region.mean(axis=(0, 1), dtype=int)
             image[self.start_y:self.end_y, self.start_x:self.end_x] = average_color
         elif self.shape == BorderShape.ELLIPSE or self.shape == BorderShape.BOTH:
-            mask = np.zeros(image.shape[:2], dtype=np.uint8)  # Create a single-channel mask
+            # gaussian elliptical blur
+            blur_strength = 101 # odd number
+            mask = np.zeros(image.shape[:2], dtype=np.uint8)
             cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
-            average_color = cv2.mean(image, mask=mask)[:3]
-            image[mask == 255] = average_color
+            blurred_region = cv2.GaussianBlur(image, (blur_strength, blur_strength), 0)
+            image[mask == 255] = blurred_region[mask == 255]
+
+            # # average blur
+            # mask = np.zeros(image.shape[:2], dtype=np.uint8)  # Create a single-channel mask
+            # cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
+            # average_color = cv2.mean(image, mask=mask)[:3]
+            # image[mask == 255] = average_color
     
     def __str__(self):
         return f'{self.start_x} {self.start_y} {self.end_x} {self.end_y}'
