@@ -3,7 +3,7 @@ from pathlib import Path
 # rosbags
 from rosbags.highlevel import AnyReader, AnyReaderError
 from rosbags.rosbag1 import Writer, WriterError
-from rosbags.typesys import get_typestore, Stores
+from rosbags.typesys import Stores, get_types_from_msg, get_typestore
 from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage as CompressedImage
 # opencv
 import cv2
@@ -14,6 +14,10 @@ from enum import Enum
 import sys
 import copy
 
+def guess_msgtype(path: Path) -> str:
+    name = path.relative_to(path.parents[0]).with_suffix('')
+    name = 'gnss_comm/' + name.name
+    return str(name)
 
 class Action(Enum):
     PASSTHROUGH = 1
@@ -227,8 +231,16 @@ class Application:
 
         # helper objects
         self.typestore = get_typestore(Stores.ROS1_NOETIC)
-        self.bridge = CvBridge()
+        add_types = {}
 
+        for pathstr in ['GnssTimeMsg.msg', 'GnssEphemMsg.msg', 'GnssGloEphemMsg.msg', 'StampedFloat64Array.msg', 'GnssObsMsg.msg', 'GnssMeasMsg.msg', 'GnssPVTSolnMsg.msg', 'GnssTimePulseInfoMsg.msg']:
+            msgpath = Path(pathstr)
+            msgdef = msgpath.read_text(encoding='utf-8')
+            add_types.update(get_types_from_msg(msgdef, guess_msgtype(msgpath)))
+
+        self.typestore.register(add_types)
+
+        self.bridge = CvBridge()
 
         cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
         cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
@@ -236,7 +248,14 @@ class Application:
         cam_topics = [cam0_topic, cam1_topic, cam2_topic]
         self.passthrough_topics = [
             '/alphasense_driver_ros/imu',
-            '/hesai/pandar'
+            '/hesai/pandar',
+            '/ublox_driver/ephem',
+            '/ublox_driver/glo_ephem',
+            '/ublox_driver/iono_params',
+            '/ublox_driver/range_meas',
+            "/ublox_driver/receiver_lla",
+            '/ublox_driver/receiver_pvt',
+            '/ublox_driver/time_pulse_info',
         ]
 
         # process path
