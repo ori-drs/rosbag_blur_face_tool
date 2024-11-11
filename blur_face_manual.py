@@ -234,7 +234,7 @@ class Application:
         add_types = {}
 
         for pathstr in ['GnssTimeMsg.msg', 'GnssEphemMsg.msg', 'GnssGloEphemMsg.msg', 'StampedFloat64Array.msg', 'GnssObsMsg.msg', 'GnssMeasMsg.msg', 'GnssPVTSolnMsg.msg', 'GnssTimePulseInfoMsg.msg']:
-            msgpath = Path(pathstr)
+            msgpath = Path("gnss_msg") / pathstr
             msgdef = msgpath.read_text(encoding='utf-8')
             add_types.update(get_types_from_msg(msgdef, guess_msgtype(msgpath)))
 
