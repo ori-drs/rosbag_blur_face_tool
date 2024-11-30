@@ -1,6 +1,10 @@
+# enum
 from enum import Enum
+
+# OpenCV
 import cv2
 
+# Numpy
 import numpy as np
 
 class BorderShape(Enum):

@@ -1,5 +1,8 @@
+# blur_face_manual
 from blur_face_manual.BlurRegion import BlurRegion
 from blur_face_manual.Cam import Cam
+
+# path
 from pathlib import Path
 
 class SaveFileHandler:

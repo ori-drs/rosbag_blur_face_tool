@@ -18,7 +18,7 @@ import copy
 # pathlib
 from pathlib import Path
 
-# other files
+# blur_face_manual
 from blur_face_manual.BlurRegion import BlurRegion, draw_crosshair, blur_image
 from blur_face_manual.Cam import Cam
 from blur_face_manual.SaveFileHandler import SaveFileHandler

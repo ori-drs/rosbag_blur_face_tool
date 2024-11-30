@@ -1,3 +1,4 @@
+# blue_face_manual
 from blur_face_manual.BlurRegion import BlurRegion
 
 class Cam:
