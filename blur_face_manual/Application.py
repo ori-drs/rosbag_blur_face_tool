@@ -245,9 +245,9 @@ class Application:
             elif key == ord('q'):
                 break
             elif key == ord('e'):
+                self.write_regions_to_file(self.save_name)
                 self.BagFileHandler.export_data_to_bag(self.output_bag_name)
             elif key == ord('w'):
-                self.BagFileHandler.export_data_to_bag(self.output_bag_name)
                 self.write_regions_to_file(self.save_name)
             elif key == ord('r'):
                 self.read_regions_from_file(self.save_name)
