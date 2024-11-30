@@ -5,7 +5,11 @@ class Cam:
     def __init__(self):
         # data and blur regions
         self.msg_list = []
+
+        self.images = []
         self.blur_regions = []
+        self.current_frame = 0
+        self.total_frames = 0
 
         # images
         self.image = None
@@ -26,6 +30,12 @@ class Cam:
 
         # previous region
         self.last_region = None
+
+    def set_images(self, images):
+        self.images = images
+
+    def get_current_image(self):
+        return self.images[self.current_frame].copy()
     
     def __str__(self):
         string = ''

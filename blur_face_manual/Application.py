@@ -22,6 +22,7 @@ class Application:
 
         # helper objects
         self.BagFileHandler = BagFileHandler(input_bag_path)
+        self.cams = self.BagFileHandler.get_cams()
 
         # process path
         self.input_bag_path = input_bag_path
@@ -58,48 +59,48 @@ class Application:
     def mouse_callback(self, event, x, y, flags, ith):
         # remove cursor from other windows
         for i in range(3):
-            if self.BagFileHandler.cam[i].mouse_in_window:
-                self.BagFileHandler.cam[i].mouse_in_window = False
+            if self.cams[i].mouse_in_window:
+                self.cams[i].mouse_in_window = False
                 self.render_window(i)
-        self.BagFileHandler.cam[ith].mouse_in_window = True
+        self.cams[ith].mouse_in_window = True
         
         if event == cv2.EVENT_LBUTTONDOWN:
-            self.BagFileHandler.cam[ith].dragging = True
-            self.BagFileHandler.cam[ith].drag_start_x = x
-            self.BagFileHandler.cam[ith].drag_start_y = y
-            self.BagFileHandler.cam[ith].drag_end_x = x
-            self.BagFileHandler.cam[ith].drag_end_y = y
+            self.cams[ith].dragging = True
+            self.cams[ith].drag_start_x = x
+            self.cams[ith].drag_start_y = y
+            self.cams[ith].drag_end_x = x
+            self.cams[ith].drag_end_y = y
 
-            self.BagFileHandler.cam[ith].moved_enoughed_distance = False
+            self.cams[ith].moved_enoughed_distance = False
 
         elif event == cv2.EVENT_MOUSEMOVE:
-            self.BagFileHandler.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.BagFileHandler.cam[ith].drag_start_x, self.BagFileHandler.cam[ith].drag_start_y, x, y)            
-            self.BagFileHandler.cam[ith].drag_end_x = x
-            self.BagFileHandler.cam[ith].drag_end_y = y
+            self.cams[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cams[ith].drag_start_x, self.cams[ith].drag_start_y, x, y)            
+            self.cams[ith].drag_end_x = x
+            self.cams[ith].drag_end_y = y
 
             # position
-            self.BagFileHandler.cam[ith].mouse_x, self.BagFileHandler.cam[ith].mouse_y = x, y
+            self.cams[ith].mouse_x, self.cams[ith].mouse_y = x, y
 
         elif event == cv2.EVENT_LBUTTONUP:
-            self.BagFileHandler.cam[ith].dragging = False
-            self.BagFileHandler.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.BagFileHandler.cam[ith].drag_start_x, self.BagFileHandler.cam[ith].drag_start_y, x, y)
-            self.BagFileHandler.cam[ith].drag_end_x = x
-            self.BagFileHandler.cam[ith].drag_end_y = y
+            self.cams[ith].dragging = False
+            self.cams[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cams[ith].drag_start_x, self.cams[ith].drag_start_y, x, y)
+            self.cams[ith].drag_end_x = x
+            self.cams[ith].drag_end_y = y
 
-            if self.BagFileHandler.cam[ith].moved_enoughed_distance:
+            if self.cams[ith].moved_enoughed_distance:
                 # add blur region from dragged region
                 blur_region = BlurRegion()
-                blur_region.set_region(self.BagFileHandler.cam[ith].drag_start_x, self.BagFileHandler.cam[ith].drag_start_y, self.BagFileHandler.cam[ith].drag_end_x, self.BagFileHandler.cam[ith].drag_end_y)
-                self.BagFileHandler.cam[ith].blur_regions[self.BagFileHandler.current_frame[ith]].append(blur_region)
+                blur_region.set_region(self.cams[ith].drag_start_x, self.cams[ith].drag_start_y, self.cams[ith].drag_end_x, self.cams[ith].drag_end_y)
+                self.cams[ith].blur_regions[self.cams[ith].current_frame].append(blur_region)
 
                 # save previous region
-                self.BagFileHandler.cam[ith].last_region = copy.deepcopy(blur_region)
+                self.cams[ith].last_region = copy.deepcopy(blur_region)
             else:
                 # add blur region from saved width and height
-                if self.BagFileHandler.cam[ith].last_region:
-                    blur_region = copy.deepcopy(self.BagFileHandler.cam[ith].last_region)
+                if self.cams[ith].last_region:
+                    blur_region = copy.deepcopy(self.cams[ith].last_region)
                     blur_region.set_bottom_right_corner(x, y)
-                    self.BagFileHandler.cam[ith].blur_regions[self.BagFileHandler.current_frame[ith]].append(blur_region)
+                    self.cams[ith].blur_regions[self.cams[ith].current_frame].append(blur_region)
 
         elif event == cv2.EVENT_MBUTTONDOWN or event == cv2.EVENT_RBUTTONDOWN:
             self.erase_region_under_cursor()
@@ -129,12 +130,12 @@ class Application:
 
     def increase_frame(self, num):
         for ith in range(3):
-            self.BagFileHandler.current_frame[ith] = min(len(self.BagFileHandler.cam[ith].msg_list) - 1, self.BagFileHandler.current_frame[ith] + num)
+            self.cams[ith].current_frame = min(self.cams[ith].total_frames - 1, self.cams[ith].current_frame + num)
         self.render_windows()
 
     def decrease_frame(self, num):
         for ith in range(3):
-            self.BagFileHandler.current_frame[ith] = max(0, self.BagFileHandler.current_frame[ith] - num)
+            self.cams[ith].current_frame = max(0, self.cams[ith].current_frame - num)
         self.render_windows()
     
     def render_windows(self):
@@ -143,30 +144,30 @@ class Application:
 
     def render_window(self, ith):
         # get base image
-        window_content = self.BagFileHandler.get_image_at_frame(ith, self.BagFileHandler.current_frame[ith])
+        window_content = self.cams[ith].get_current_image()
 
         # draw blur regions border or blur regions
         if self.render_type == DisplayType.PREBLUR:
-            for region in self.BagFileHandler.cam[ith].blur_regions[self.BagFileHandler.current_frame[ith]]:
+            for region in self.cams[ith].blur_regions[self.cams[ith].current_frame]:
                 region.draw_border(window_content)
         elif self.render_type == DisplayType.BLURRED:
-            all_regions = self.BagFileHandler.cam[ith].blur_regions[self.BagFileHandler.current_frame[ith]]
+            all_regions = self.cams[ith].blur_regions[self.cams[ith].current_frame]
             blur_image(window_content, all_regions)
 
         # draw cursor
-        mouse_location = (self.BagFileHandler.cam[ith].mouse_x, self.BagFileHandler.cam[ith].mouse_y)
-        if self.BagFileHandler.cam[ith].mouse_in_window & (not self.BagFileHandler.cam[ith].dragging):
-            if self.BagFileHandler.cam[ith].last_region:
-                cursor_region = copy.deepcopy(self.BagFileHandler.cam[ith].last_region)
-                cursor_region.set_bottom_right_corner(self.BagFileHandler.cam[ith].mouse_x, self.BagFileHandler.cam[ith].mouse_y)
+        mouse_location = (self.cams[ith].mouse_x, self.cams[ith].mouse_y)
+        if self.cams[ith].mouse_in_window & (not self.cams[ith].dragging):
+            if self.cams[ith].last_region:
+                cursor_region = copy.deepcopy(self.cams[ith].last_region)
+                cursor_region.set_bottom_right_corner(self.cams[ith].mouse_x, self.cams[ith].mouse_y)
                 cursor_region.draw_border_with_crosshair(window_content)
             else :
                 draw_crosshair(window_content, mouse_location)
 
         # draw live blur regions while dragging
-        if self.BagFileHandler.cam[ith].dragging and self.BagFileHandler.cam[ith].moved_enoughed_distance:
+        if self.cams[ith].dragging and self.cams[ith].moved_enoughed_distance:
             live_region = BlurRegion()
-            live_region.set_region(self.BagFileHandler.cam[ith].drag_start_x, self.BagFileHandler.cam[ith].drag_start_y, self.BagFileHandler.cam[ith].drag_end_x, self.BagFileHandler.cam[ith].drag_end_y)
+            live_region.set_region(self.cams[ith].drag_start_x, self.cams[ith].drag_start_y, self.cams[ith].drag_end_x, self.cams[ith].drag_end_y)
             live_region.draw_border_with_crosshair(window_content)
         
         # update window
@@ -174,58 +175,58 @@ class Application:
 
     def write_regions_to_file(self, path):
         save_file_handler = SaveFileHandler()
-        save_file_handler.write_to_save_file(path, self.BagFileHandler.cam)
+        save_file_handler.write_to_save_file(path, self.cams)
 
     def read_regions_from_file(self, path):
         save_file_handler = SaveFileHandler()
         loaded_cam = save_file_handler.read_from_save_file(path)
         if loaded_cam:    
             for ith in range(3):
-                self.BagFileHandler.cam[ith].blur_regions = loaded_cam[ith].blur_regions
+                self.cams[ith].blur_regions = loaded_cam[ith].blur_regions
         
     def increase_region_size(self):
         for ith in range(3):
-            if self.BagFileHandler.cam[ith].mouse_in_window and self.BagFileHandler.cam[ith].last_region:
-                self.BagFileHandler.cam[ith].last_region.increase_size(0.05)    
+            if self.cams[ith].mouse_in_window and self.cams[ith].last_region:
+                self.cams[ith].last_region.increase_size(0.05)    
                 self.render_window(ith)
     
     def decrease_region_size(self):
         for ith in range(3):
-            if self.BagFileHandler.cam[ith].mouse_in_window and self.BagFileHandler.cam[ith].last_region:
-                self.BagFileHandler.cam[ith].last_region.decrease_size(0.05)    
+            if self.cams[ith].mouse_in_window and self.cams[ith].last_region:
+                self.cams[ith].last_region.decrease_size(0.05)    
                 self.render_window(ith)
 
     def confirm_and_increase_frame(self):
         added_region = False
         for ith in range(3):
-            if self.BagFileHandler.cam[ith].mouse_in_window and self.BagFileHandler.cam[ith].last_region:
-                blur_region = copy.deepcopy(self.BagFileHandler.cam[ith].last_region)
-                blur_region.set_bottom_right_corner(self.BagFileHandler.cam[ith].mouse_x, self.BagFileHandler.cam[ith].mouse_y)
-                self.BagFileHandler.cam[ith].blur_regions[self.BagFileHandler.current_frame[ith]].append(blur_region)
+            if self.cams[ith].mouse_in_window and self.cams[ith].last_region:
+                blur_region = copy.deepcopy(self.cams[ith].last_region)
+                blur_region.set_bottom_right_corner(self.cams[ith].mouse_x, self.cams[ith].mouse_y)
+                self.cams[ith].blur_regions[self.cams[ith].current_frame].append(blur_region)
                 added_region = True
         if added_region:
             self.increase_frame(1)
 
     def erase_region_under_cursor(self):
         for ith in range(3):
-            if self.BagFileHandler.cam[ith].mouse_in_window:
-                x = self.BagFileHandler.cam[ith].mouse_x
-                y = self.BagFileHandler.cam[ith].mouse_y
+            if self.cams[ith].mouse_in_window:
+                x = self.cams[ith].mouse_x
+                y = self.cams[ith].mouse_y
 
                 # # erase under crosshair
                 # if self.RosbagHandler.cam[ith].last_region:
                 #     x -= self.RosbagHandler.cam[ith].last_region.width // 2
                 #     y -= self.RosbagHandler.cam[ith].last_region.height // 2
                 
-                for region in reversed(self.BagFileHandler.cam[ith].blur_regions[self.BagFileHandler.current_frame[ith]]):
+                for region in reversed(self.cams[ith].blur_regions[self.cams[ith].current_frame]):
                     if region.contains(x, y):
-                        self.BagFileHandler.cam[ith].blur_regions[self.BagFileHandler.current_frame[ith]].remove(region)
+                        self.cams[ith].blur_regions[self.cams[ith].current_frame].remove(region)
                         self.render_window(ith)
                         break
     
     def set_current_frame_as_ratio(self, ratio):
         for ith in range(3):
-            self.BagFileHandler.current_frame[ith] = max(0, int(ratio * len(self.BagFileHandler.cam[ith].msg_list)) - 1)
+            self.cams[ith].current_frame = max(0, int(ratio * self.cams[ith].total_frames) - 1)
 
     def run(self):
         while True:
@@ -246,7 +247,7 @@ class Application:
                 break
             elif key == ord('e'):
                 self.write_regions_to_file(self.save_name)
-                self.BagFileHandler.export_data_to_bag(self.output_bag_name)
+                self.BagFileHandler.export_data_to_bag(self.output_bag_name, self.cams)
             elif key == ord('w'):
                 self.write_regions_to_file(self.save_name)
             elif key == ord('r'):
