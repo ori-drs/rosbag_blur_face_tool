@@ -25,7 +25,7 @@ class Action(Enum):
     PASSTHROUGH = 1
     FILTER = 2
 
-class RosbagHandler:
+class BagFileHandler:
     def __init__(self, path: str):
         self.input_bag_path = path
         self.typestore = get_typestore(Stores.ROS1_NOETIC)
