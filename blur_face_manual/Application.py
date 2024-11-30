@@ -1,18 +1,27 @@
-# path
-from pathlib import Path
 # rosbags
+from rosbags.typesys import get_typestore, Stores
 from rosbags.highlevel import AnyReader, AnyReaderError
 from rosbags.rosbag1 import Writer, WriterError
-from rosbags.typesys import get_typestore, Stores
 from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage as CompressedImage
+
 # opencv
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+
 # enum
 from enum import Enum
-import sys
+
+# copy
 import copy
+
+# pathlib
+from pathlib import Path
+
+# other files
+from blur_face_manual.BlurRegion import BlurRegion, draw_crosshair, blur_image
+from blur_face_manual.Cam import Cam
+from blur_face_manual.SaveFileHandler import SaveFileHandler
 
 
 class Action(Enum):
@@ -23,204 +32,6 @@ class DisplayType(Enum):
     PREBLUR = 1
     BLURRED = 2
 
-class BorderShape(Enum):
-    RECTANGLE = 1
-    ELLIPSE = 2
-    BOTH = 3
-
-class BlurRegion:
-    def __init__(self):
-        self.shape = BorderShape.ELLIPSE
-        pass
-
-    def set_region(self, start_x, start_y, end_x, end_y):
-        self.start_x = start_x
-        self.start_y = start_y
-        self.end_x = end_x
-        self.end_y = end_y
-
-        self.width = abs(self.end_x - self.start_x)
-        self.height = abs(self.end_y - self.start_y)
-
-        self.original_width = self.width
-        self.original_ratio = self.height / self.width
-        
-        self.magnification = 1
-
-    def set_bottom_right_corner(self, x, y):
-        self.end_x = x
-        self.end_y = y
-
-        self.start_x = self.end_x - self.width
-        self.start_y = self.end_y - self.height
-
-    def increase_size(self, step):
-        self.magnification += step
-
-        self.width = int(self.original_width * self.magnification)
-        self.height = int(self.original_width * self.magnification * self.original_ratio)
-
-        # update end points
-        self.end_x = self.start_x + self.width
-        self.end_y = self.start_y + self.height
-    
-    def decrease_size(self, step):
-        self.magnification = max(step, self.magnification - step)
-
-        self.width = int(self.original_width * self.magnification)
-        self.height = int(self.original_width * self.magnification * self.original_ratio)
-
-        # update end points
-        self.end_x = self.start_x + self.width
-        self.end_y = self.start_y + self.height
-
-    def contains(self, x, y):
-        return self.start_x <= x <= self.end_x and self.start_y <= y <= self.end_y
-    
-    def draw_rectangle(self, image, color = (0, 0, 255), thickness = 2):
-        cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
-    
-    def draw_ellipse(self, image, color = (0, 0, 255), thickness = 2):
-        cv2.ellipse(image, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, color, thickness = thickness)
-
-    def draw_border(self, image, color = (0, 0, 255), thickness = 2):
-        if self.shape == BorderShape.RECTANGLE:
-            self.draw_rectangle(image, color, thickness)
-        elif self.shape == BorderShape.ELLIPSE:
-            self.draw_ellipse(image, color, thickness)
-        elif self.shape == BorderShape.BOTH:
-            self.draw_rectangle(image, color, thickness)
-            self.draw_ellipse(image, color, thickness)
-
-    def draw_border_with_crosshair(self, image, color = (0, 0, 255), thickness = 2):
-        self.draw_border(image, color, thickness)
-        crosshair_x = (self.start_x + self.end_x) // 2
-        crosshair_y = (self.start_y + self.end_y) // 2
-        draw_crosshair(image, (crosshair_x, crosshair_y))
-    
-    def blur_region(self, image, shape = BorderShape.ELLIPSE):
-        if self.shape == BorderShape.RECTANGLE:
-            region = image[self.start_y:self.end_y, self.start_x:self.end_x]
-            average_color = region.mean(axis=(0, 1), dtype=int)
-            image[self.start_y:self.end_y, self.start_x:self.end_x] = average_color
-        elif self.shape == BorderShape.ELLIPSE or self.shape == BorderShape.BOTH:
-            # gaussian elliptical blur
-            blur_strength = 101 # odd number
-            mask = np.zeros(image.shape[:2], dtype=np.uint8)
-            cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
-            blurred_region = cv2.GaussianBlur(image, (blur_strength, blur_strength), 0)
-            image[mask == 255] = blurred_region[mask == 255]
-
-            # # average blur
-            # mask = np.zeros(image.shape[:2], dtype=np.uint8)  # Create a single-channel mask
-            # cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
-            # average_color = cv2.mean(image, mask=mask)[:3]
-            # image[mask == 255] = average_color
-    
-    def __str__(self):
-        return f'{self.start_x} {self.start_y} {self.end_x} {self.end_y}'
-
-    def from_str(self, s):
-        self.set_region(*map(int, s.split(' ')))
-        return self
-
-class Cam:
-    def __init__(self):
-        # data and blur regions
-        self.msg_list = []
-        self.blur_regions = []
-
-        # images
-        self.image = None
-        self.display_image = None
-        
-        # mouse position
-        self.mouse_x = -1
-        self.mouse_y = -1
-        self.mouse_in_window = False
-
-        # dragging
-        self.dragging = False
-        self.drag_start_x = 0
-        self.drag_start_y = 0
-        self.drag_end_x = 0
-        self.drag_end_y = 0
-        self.moved_enoughed_distance = False
-
-        # previous region
-        self.last_region = None
-    
-    def __str__(self):
-        string = ''
-        for frame, regions in enumerate(self.blur_regions):
-            for region in regions:
-                string += f'{frame} {region}\n'
-        return string
-    
-    def from_str(self, s):
-        lines = s.split('\n')
-        self.blur_regions = [[] for _ in range(len(lines))]
-        for line in lines:
-            if line:
-                frame, region_str = line.split(' ', 1)
-                blur_region = BlurRegion()
-                blur_region.from_str(region_str)
-                self.blur_regions[int(frame)].append(blur_region)
-        return self
-
-class SaveFileHandler:
-
-    def __init__(self):
-        pass
-
-    def write_to_save_file(self, path, cams):
-        with open(path, 'w') as f:
-            for ith, cam in enumerate(cams):
-                f.write(f'cam{ith} {len(cam.blur_regions)}\n')
-                f.write(str(cam))
-        print(f'blurred regions written to "./{path}".')
-    
-    def read_from_save_file(self, path):
-        if not Path(path).exists():
-            print(f'file "./{path}" does not exist.')
-            return None
-
-        cams = []
-
-        with open(path, 'r') as f:
-            lines = f.readlines()
-
-            current_cam = None
-            for line in lines:
-                if line.startswith('cam'):
-                    length = int(line[5:])
-                    current_cam = Cam()
-                    current_cam.blur_regions = [[] for _ in range(length)]
-                    cams.append(current_cam)
-                else:
-                    index, region_str = line.split(' ', 1)
-                    blur_region = BlurRegion().from_str(region_str)
-                    current_cam.blur_regions[int(index)].append(blur_region)
-        
-        print(f'blurred regions read from "./{path}".')
-
-        return cams
-
-# image processing
-def draw_crosshair(image, mouse_location):
-    # Draw horizontal and vertical lines to create the crosshair
-    line_length = 20
-    color = (0, 0, 255)
-    thickness = 2
-
-    if mouse_location[0] != -1 and mouse_location[1] != -1:
-        cv2.line(image, (mouse_location[0] - line_length, mouse_location[1]), (mouse_location[0] + line_length, mouse_location[1]), color, thickness)
-        cv2.line(image, (mouse_location[0], mouse_location[1] - line_length), (mouse_location[0], mouse_location[1] + line_length), color, thickness)
-
-def blur_image(image, region_list):
-    for region in region_list:
-        region.blur_region(image)
-        
 class Application:
 
     def __init__(self, input_bag_path):
@@ -654,15 +465,3 @@ class Application:
 
         cv2.destroyAllWindows()
 
-
-if __name__ == '__main__':
-    
-    if len(sys.argv) == 2:
-        bag_file = Path(sys.argv[1])
-    else:
-        bag_file = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
-        print("Usage: python blur_face_manual.py <path_to_bag_file>")
-        print(f"Using default bag file {bag_file}")
-
-    app = Application(bag_file)
-    app.run()

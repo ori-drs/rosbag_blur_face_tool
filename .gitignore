@@ -2,3 +2,4 @@
 save.txt
 *.bag
 *save.txt
+__pycache__/
