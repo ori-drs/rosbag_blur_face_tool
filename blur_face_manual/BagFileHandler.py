@@ -180,12 +180,10 @@ class BagFileHandler:
                     cams[ith].blur_regions = [[] for _ in range(cams[ith].total_frames)]
                     
                     # read images
-                    images = []
                     for connection, timestamp, rawdata in reader.messages(connections=[connection]):
+                        print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
                         msg = self.typestore.deserialize_ros1(rawdata, connection.msgtype)
-                        image = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding='passthrough')
-                        images.append(image)
-                    cams[ith].set_images(images)
+                        cams[ith].compressed_imgmsg_list.append(msg)
 
                     cams[ith].msg_list = list(reader.messages(connections=[connection]))
         

@@ -1,10 +1,16 @@
 # blue_face_manual
 from blur_face_manual.BlurRegion import BlurRegion
 
+# cv2
+from cv_bridge import CvBridge
+
 class Cam:
     def __init__(self):
         # data and blur regions
         self.msg_list = []
+        self.compressed_imgmsg_list = []
+
+        self.bridge = CvBridge()
 
         self.images = []
         self.blur_regions = []
@@ -31,11 +37,8 @@ class Cam:
         # previous region
         self.last_region = None
 
-    def set_images(self, images):
-        self.images = images
-
     def get_current_image(self):
-        return self.images[self.current_frame].copy()
+        return self.bridge.compressed_imgmsg_to_cv2(self.compressed_imgmsg_list[self.current_frame], desired_encoding='passthrough')
     
     def __str__(self):
         string = ''
