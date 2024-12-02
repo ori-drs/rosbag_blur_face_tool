@@ -1,32 +1,46 @@
 # path
+import copy
+import sys
+# enum
+from enum import Enum
 from pathlib import Path
+
+# opencv
+import cv2
+import numpy as np
+from cv_bridge import CvBridge
 # rosbags
 from rosbags.highlevel import AnyReader, AnyReaderError
 from rosbags.rosbag1 import Writer, WriterError
 from rosbags.typesys import get_typestore, Stores
 from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage as CompressedImage
-# opencv
-import cv2
-import numpy as np
-from cv_bridge import CvBridge
-# enum
-from enum import Enum
-import sys
-import copy
 
 
 class Action(Enum):
     PASSTHROUGH = 1
     FILTER = 2
 
+
 class DisplayType(Enum):
     PREBLUR = 1
     BLURRED = 2
+
 
 class BorderShape(Enum):
     RECTANGLE = 1
     ELLIPSE = 2
     BOTH = 3
+
+class KeyFrame:
+    def __init__(self, cam_id, region, frame_number):
+        super().__init__()
+        self.cam_id = cam_id
+        self.region = region
+        self.frame_number = frame_number
+
+    def __str__(self):
+        return f'{self.cam_id} {str(self.region)} {self.frame_number}'
+
 
 class BlurRegion:
     def __init__(self):
@@ -34,17 +48,17 @@ class BlurRegion:
         pass
 
     def set_region(self, start_x, start_y, end_x, end_y):
-        self.start_x = start_x
-        self.start_y = start_y
-        self.end_x = end_x
-        self.end_y = end_y
+        self.start_x = min(start_x, end_x)
+        self.start_y = min(start_y, end_y)
+        self.end_x = max(start_x, end_x)
+        self.end_y = max(start_y, end_y)
 
         self.width = abs(self.end_x - self.start_x)
         self.height = abs(self.end_y - self.start_y)
 
         self.original_width = self.width
         self.original_ratio = self.height / self.width
-        
+
         self.magnification = 1
 
     def set_bottom_right_corner(self, x, y):
@@ -63,7 +77,7 @@ class BlurRegion:
         # update end points
         self.end_x = self.start_x + self.width
         self.end_y = self.start_y + self.height
-    
+
     def decrease_size(self, step):
         self.magnification = max(step, self.magnification - step)
 
@@ -76,14 +90,15 @@ class BlurRegion:
 
     def contains(self, x, y):
         return self.start_x <= x <= self.end_x and self.start_y <= y <= self.end_y
-    
-    def draw_rectangle(self, image, color = (0, 0, 255), thickness = 2):
-        cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
-    
-    def draw_ellipse(self, image, color = (0, 0, 255), thickness = 2):
-        cv2.ellipse(image, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, color, thickness = thickness)
 
-    def draw_border(self, image, color = (0, 0, 255), thickness = 2):
+    def draw_rectangle(self, image, color=(0, 0, 255), thickness=2):
+        cv2.rectangle(image, (self.start_x, self.start_y), (self.end_x, self.end_y), color, thickness)
+
+    def draw_ellipse(self, image, color=(0, 0, 255), thickness=2):
+        cv2.ellipse(image, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2),
+                    (self.width // 2, self.height // 2), 0, 0, 360, color, thickness=thickness)
+
+    def draw_border(self, image, color=(0, 0, 255), thickness=2):
         if self.shape == BorderShape.RECTANGLE:
             self.draw_rectangle(image, color, thickness)
         elif self.shape == BorderShape.ELLIPSE:
@@ -92,22 +107,23 @@ class BlurRegion:
             self.draw_rectangle(image, color, thickness)
             self.draw_ellipse(image, color, thickness)
 
-    def draw_border_with_crosshair(self, image, color = (0, 0, 255), thickness = 2):
+    def draw_border_with_crosshair(self, image, color=(0, 0, 255), thickness=2):
         self.draw_border(image, color, thickness)
         crosshair_x = (self.start_x + self.end_x) // 2
         crosshair_y = (self.start_y + self.end_y) // 2
         draw_crosshair(image, (crosshair_x, crosshair_y))
-    
-    def blur_region(self, image, shape = BorderShape.ELLIPSE):
+
+    def blur_region(self, image, shape=BorderShape.ELLIPSE):
         if self.shape == BorderShape.RECTANGLE:
             region = image[self.start_y:self.end_y, self.start_x:self.end_x]
             average_color = region.mean(axis=(0, 1), dtype=int)
             image[self.start_y:self.end_y, self.start_x:self.end_x] = average_color
         elif self.shape == BorderShape.ELLIPSE or self.shape == BorderShape.BOTH:
             # gaussian elliptical blur
-            blur_strength = 101 # odd number
+            blur_strength = 101  # odd number
             mask = np.zeros(image.shape[:2], dtype=np.uint8)
-            cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
+            cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2),
+                        (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
             blurred_region = cv2.GaussianBlur(image, (blur_strength, blur_strength), 0)
             image[mask == 255] = blurred_region[mask == 255]
 
@@ -116,13 +132,28 @@ class BlurRegion:
             # cv2.ellipse(mask, ((self.start_x + self.end_x) // 2, (self.start_y + self.end_y) // 2), (self.width // 2, self.height // 2), 0, 0, 360, 255, thickness=-1)
             # average_color = cv2.mean(image, mask=mask)[:3]
             # image[mask == 255] = average_color
-    
+
     def __str__(self):
         return f'{self.start_x} {self.start_y} {self.end_x} {self.end_y}'
 
     def from_str(self, s):
         self.set_region(*map(int, s.split(' ')))
         return self
+
+def interpolate_blur_region(frame_a: int, blur_a:BlurRegion, frame_b: int, blur_b: BlurRegion,
+                            output_frame: int):
+    span = frame_b - frame_a - 1
+    time_to_a = output_frame - frame_a
+    coeff_a = 1.0 - (float(time_to_a) / float(span))
+    coeff_b = 1.0 - coeff_a
+    output = BlurRegion()
+    output.set_region(
+        int(np.round(blur_a.start_x * coeff_a + blur_b.start_x * coeff_b)),
+        int(np.round(blur_a.start_y * coeff_a + blur_b.start_y * coeff_b)),
+        int(np.round(blur_a.end_x * coeff_a + blur_b.end_x * coeff_b)),
+        int(np.round(blur_a.end_y * coeff_a + blur_b.end_y * coeff_b)),
+    )
+    return output
 
 class Cam:
     def __init__(self):
@@ -133,7 +164,7 @@ class Cam:
         # images
         self.image = None
         self.display_image = None
-        
+
         # mouse position
         self.mouse_x = -1
         self.mouse_y = -1
@@ -149,14 +180,14 @@ class Cam:
 
         # previous region
         self.last_region = None
-    
+
     def __str__(self):
         string = ''
         for frame, regions in enumerate(self.blur_regions):
             for region in regions:
                 string += f'{frame} {region}\n'
         return string
-    
+
     def from_str(self, s):
         lines = s.split('\n')
         self.blur_regions = [[] for _ in range(len(lines))]
@@ -167,6 +198,7 @@ class Cam:
                 blur_region.from_str(region_str)
                 self.blur_regions[int(frame)].append(blur_region)
         return self
+
 
 class SaveFileHandler:
 
@@ -179,7 +211,7 @@ class SaveFileHandler:
                 f.write(f'cam{ith} {len(cam.blur_regions)}\n')
                 f.write(str(cam))
         print(f'blurred regions written to "./{path}".')
-    
+
     def read_from_save_file(self, path):
         if not Path(path).exists():
             print(f'file "./{path}" does not exist.')
@@ -201,10 +233,11 @@ class SaveFileHandler:
                     index, region_str = line.split(' ', 1)
                     blur_region = BlurRegion().from_str(region_str)
                     current_cam.blur_regions[int(index)].append(blur_region)
-        
+
         print(f'blurred regions read from "./{path}".')
 
         return cams
+
 
 # image processing
 def draw_crosshair(image, mouse_location):
@@ -214,13 +247,17 @@ def draw_crosshair(image, mouse_location):
     thickness = 2
 
     if mouse_location[0] != -1 and mouse_location[1] != -1:
-        cv2.line(image, (mouse_location[0] - line_length, mouse_location[1]), (mouse_location[0] + line_length, mouse_location[1]), color, thickness)
-        cv2.line(image, (mouse_location[0], mouse_location[1] - line_length), (mouse_location[0], mouse_location[1] + line_length), color, thickness)
+        cv2.line(image, (mouse_location[0] - line_length, mouse_location[1]),
+                 (mouse_location[0] + line_length, mouse_location[1]), color, thickness)
+        cv2.line(image, (mouse_location[0], mouse_location[1] - line_length),
+                 (mouse_location[0], mouse_location[1] + line_length), color, thickness)
+
 
 def blur_image(image, region_list):
     for region in region_list:
         region.blur_region(image)
-        
+
+
 class Application:
 
     def __init__(self, input_bag_path):
@@ -228,7 +265,8 @@ class Application:
         # helper objects
         self.typestore = get_typestore(Stores.ROS1_NOETIC)
         self.bridge = CvBridge()
-
+        self.key_frame_being_dragged = False
+        self.key_frame_start = None
 
         cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
         cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
@@ -257,11 +295,11 @@ class Application:
 
         # try read save file at start
         self.read_regions_from_file(self.save_name)
-        
+
 
         self.other_topics_action = Action.FILTER
         self.threashold_distance = 30
-        
+
         self.render_type = DisplayType.PREBLUR
 
         # # process passthrough topics and other topics
@@ -292,25 +330,26 @@ class Application:
             if connection.topic in self.cam_topics:
                 pass
             elif connection.topic in self.passthrough_topics:
-                new_connection = self.writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=self.typestore)
+                new_connection = self.writer.add_connection(connection.topic, connection.msgtype,
+                                                            msgdef=connection.msgdef, typestore=self.typestore)
                 for connection, timestamp, rawdata in self.reader.messages(connections=[connection]):
                     self.writer.write(new_connection, timestamp, rawdata)
             else:
                 if self.other_topics_action == Action.PASSTHROUGH:
-                    new_connection = self.writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=self.typestore)
+                    new_connection = self.writer.add_connection(connection.topic, connection.msgtype,
+                                                                msgdef=connection.msgdef, typestore=self.typestore)
                     for connection, timestamp, rawdata in self.reader.messages(connections=[connection]):
                         self.writer.write(new_connection, timestamp, rawdata)
                 elif self.other_topics_action == Action.FILTER:
                     pass
 
     def check_if_move_enoughed_distance(self, start_x, start_y, end_x, end_y):
-        moved_x = (end_x - start_x)**2
-        moved_y = (end_y - start_y)**2
+        moved_x = (end_x - start_x) ** 2
+        moved_y = (end_y - start_y) ** 2
         both_moved = moved_x != 0 and moved_y != 0
-        moved_enough = moved_x + moved_y > self.threashold_distance**2
+        moved_enough = moved_x + moved_y > self.threashold_distance ** 2
         return both_moved and moved_enough
 
-    
     # Mouse event callback function to update mouse position
     def mouse_callback(self, event, x, y, flags, ith):
         # remove cursor from other windows
@@ -319,7 +358,7 @@ class Application:
                 self.cam[i].mouse_in_window = False
                 self.render_window(i)
         self.cam[ith].mouse_in_window = True
-        
+
         if event == cv2.EVENT_LBUTTONDOWN:
             self.cam[ith].dragging = True
             self.cam[ith].drag_start_x = x
@@ -328,9 +367,16 @@ class Application:
             self.cam[ith].drag_end_y = y
 
             self.cam[ith].moved_enoughed_distance = False
+            if self.key_frame_start is not None and self.key_frame_start.cam_id == ith:
+                x = self.cam[ith].mouse_x
+                y = self.cam[ith].mouse_y
+                if self.key_frame_start.region.contains(x,y):
+                    self.key_frame_being_dragged = True
 
         elif event == cv2.EVENT_MOUSEMOVE:
-            self.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, x, y)            
+            self.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cam[ith].drag_start_x,
+                                                                                         self.cam[ith].drag_start_y, x,
+                                                                                         y)
             self.cam[ith].drag_end_x = x
             self.cam[ith].drag_end_y = y
 
@@ -339,24 +385,33 @@ class Application:
 
         elif event == cv2.EVENT_LBUTTONUP:
             self.cam[ith].dragging = False
-            self.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, x, y)
-            self.cam[ith].drag_end_x = x
-            self.cam[ith].drag_end_y = y
 
-            if self.cam[ith].moved_enoughed_distance:
-                # add blur region from dragged region
-                blur_region = BlurRegion()
-                blur_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
-                self.cam[ith].blur_regions[self.current_frame[ith]].append(blur_region)
+            if not self.key_frame_being_dragged:
 
-                # save previous region
-                self.cam[ith].last_region = copy.deepcopy(blur_region)
-            else:
-                # add blur region from saved width and height
-                if self.cam[ith].last_region:
-                    blur_region = copy.deepcopy(self.cam[ith].last_region)
-                    blur_region.set_bottom_right_corner(x, y)
+                self.cam[ith].moved_enoughed_distance = self.check_if_move_enoughed_distance(self.cam[ith].drag_start_x,
+                                                                                             self.cam[ith].drag_start_y, x,
+                                                                                             y)
+                self.cam[ith].drag_end_x = x
+                self.cam[ith].drag_end_y = y
+
+                if self.cam[ith].moved_enoughed_distance:
+                    # add blur region from dragged region
+                    blur_region = BlurRegion()
+                    blur_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x,
+                                           self.cam[ith].drag_end_y)
                     self.cam[ith].blur_regions[self.current_frame[ith]].append(blur_region)
+
+                    # save previous region
+                    self.cam[ith].last_region = copy.deepcopy(blur_region)
+                else:
+                    # add blur region from saved width and height
+                    if self.cam[ith].last_region:
+                        blur_region = copy.deepcopy(self.cam[ith].last_region)
+                        blur_region.set_bottom_right_corner(x, y)
+                        self.cam[ith].blur_regions[self.current_frame[ith]].append(blur_region)
+            else:
+                self.handle_key_frame_drag_end(x, y)
+                self.key_frame_being_dragged = False
 
         elif event == cv2.EVENT_MBUTTONDOWN or event == cv2.EVENT_RBUTTONDOWN:
             self.erase_region_under_cursor()
@@ -400,10 +455,60 @@ class Application:
         for ith in range(3):
             self.current_frame[ith] = max(0, self.current_frame[ith] - num)
         self.render_windows()
-    
+
     def render_windows(self):
         for ith in range(3):
             self.render_window(ith)
+
+    def set_key_frame_start(self):
+        for ith in range(3):
+            if self.cam[ith].mouse_in_window:
+                self.key_frame_start = KeyFrame(ith,
+                                                copy.deepcopy(self.cam[ith].last_region),
+                                                self.current_frame[ith])
+                break
+
+    def handle_key_frame_drag_end(self, x, y):
+
+        self.cam[self.key_frame_start.cam_id].last_region = copy.deepcopy(self.key_frame_start.region)
+        width_2 = self.key_frame_start.region.width // 2
+        height_2 = self.key_frame_start.region.height // 2
+        self.cam[self.key_frame_start.cam_id].last_region.set_region(
+            x - width_2, y - height_2, x + width_2, y + height_2
+        )
+        self.set_key_frame_end()
+        self.set_key_frame_start()
+
+    def set_key_frame_end(self):
+        if self.key_frame_start is None:
+            return
+        self.key_frame_start: KeyFrame
+        for ith in range(3):
+            if not self.cam[ith].mouse_in_window:
+                continue
+            if ith != self.key_frame_start.cam_id:
+                return
+            if self.key_frame_start.frame_number > self.current_frame[ith]:
+                return
+            if self.key_frame_start.frame_number == self.current_frame[ith]:
+                self.cam[ith].blur_regions[self.current_frame[ith]].append(
+                    copy.deepcopy(self.key_frame_start.region)
+                )
+                self.key_frame_start = None
+                return
+
+            start_frame = self.key_frame_start.frame_number
+            end_frame = self.current_frame[ith]+1
+            last_region = copy.deepcopy(self.cam[ith].last_region)
+            for frame in range(start_frame, end_frame):
+                interpolated_blur = interpolate_blur_region(
+                    start_frame, self.key_frame_start.region,
+                    end_frame, last_region,
+                    frame
+                )
+                self.cam[ith].blur_regions[frame].append(interpolated_blur)
+            self.key_frame_start = None
+            break
 
     def render_window(self, ith):
         # get base image
@@ -417,6 +522,9 @@ class Application:
             all_regions = self.cam[ith].blur_regions[self.current_frame[ith]]
             blur_image(window_content, all_regions)
 
+        if self.key_frame_start is not None and self.key_frame_start.cam_id == ith:
+            self.key_frame_start.region.draw_border(window_content, color=(0, 255, 0))
+
         # draw cursor
         mouse_location = (self.cam[ith].mouse_x, self.cam[ith].mouse_y)
         if self.cam[ith].mouse_in_window & (not self.cam[ith].dragging):
@@ -424,17 +532,29 @@ class Application:
                 cursor_region = copy.deepcopy(self.cam[ith].last_region)
                 cursor_region.set_bottom_right_corner(self.cam[ith].mouse_x, self.cam[ith].mouse_y)
                 cursor_region.draw_border_with_crosshair(window_content)
-            else :
+            else:
                 draw_crosshair(window_content, mouse_location)
 
         # draw live blur regions while dragging
         if self.cam[ith].dragging and self.cam[ith].moved_enoughed_distance:
-            live_region = BlurRegion()
-            live_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x, self.cam[ith].drag_end_y)
-            live_region.draw_border_with_crosshair(window_content)
-        
+            if self.key_frame_being_dragged and self.key_frame_start.cam_id == ith:
+                live_region = copy.deepcopy(self.key_frame_start.region)
+                width_2 = self.key_frame_start.region.width // 2
+                height_2 = self.key_frame_start.region.height // 2
+                x,y = (self.cam[ith].mouse_x, self.cam[ith].mouse_y)
+                live_region.set_region(
+                    x - width_2, y - height_2,
+                    x + width_2, y + height_2
+                )
+                live_region.draw_border_with_crosshair(window_content, (0, 255, 0))
+            else:
+                live_region = BlurRegion()
+                live_region.set_region(self.cam[ith].drag_start_x, self.cam[ith].drag_start_y, self.cam[ith].drag_end_x,
+                                       self.cam[ith].drag_end_y)
+                live_region.draw_border_with_crosshair(window_content)
+
         # update window
-        cv2.imshow('cam'+str(ith), window_content)
+        cv2.imshow('cam' + str(ith), window_content)
 
     def write_regions_to_file(self, path):
         save_file_handler = SaveFileHandler()
@@ -443,11 +563,11 @@ class Application:
     def read_regions_from_file(self, path):
         save_file_handler = SaveFileHandler()
         loaded_cam = save_file_handler.read_from_save_file(path)
-        if loaded_cam:    
+        if loaded_cam:
             for ith in range(3):
                 self.cam[ith].blur_regions = loaded_cam[ith].blur_regions
-        
-    def read_images_from_bag(self, reader, cam_topics):     
+
+    def read_images_from_bag(self, reader, cam_topics):
         self.cam = [Cam() for _ in range(len(cam_topics))]
         self.current_frame = [0 for _ in range(len(cam_topics))]
         for ith, cam_topic in enumerate(cam_topics):
@@ -466,7 +586,7 @@ class Application:
             return None
         except Exception as e:
             print('An error occurred while opening the bag file.')
-            print (e)
+            print(e)
             return None
 
     def create_writer(self, path):
@@ -485,11 +605,12 @@ class Application:
         # for each camera
         for ith, cam in enumerate(self.cam):
             input_connection, _, _ = cam.msg_list[0]
-            output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)  
+            output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype,
+                                                      msgdef=input_connection.msgdef, typestore=self.typestore)
 
             # write for each frame
             for frame in range(len(cam.msg_list)):
-                print (f'Writing frame {frame} for cam {ith}')
+                print(f'Writing frame {frame} for cam {ith}')
                 input_connection, input_timestamp, input_rawdata = cam.msg_list[frame]
 
                 # check if new blur regions are added
@@ -511,13 +632,15 @@ class Application:
         # process passthrough topics and other topics
         for input_connection in reader.connections:
             if input_connection.topic in self.passthrough_topics:
-                output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)
+                output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype,
+                                                          msgdef=input_connection.msgdef, typestore=self.typestore)
                 for input_connection, timestamp, rawdata in reader.messages(connections=[input_connection]):
                     print(f'Writing message of timestamp {timestamp} for topic {input_connection.topic}')
                     writer.write(output_connection, timestamp, rawdata)
             else:
                 if self.other_topics_action == Action.PASSTHROUGH:
-                    output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)
+                    output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype,
+                                                              msgdef=input_connection.msgdef, typestore=self.typestore)
                     for input_connection, timestamp, rawdata in reader.messages(connections=[input_connection]):
                         print(f'Writing message of timestamp {timestamp} for topic {input_connection.topic}')
                         writer.write(output_connection, timestamp, rawdata)
@@ -526,7 +649,7 @@ class Application:
 
     def export_data_to_bag(self):
         new_path = Path(self.output_bag_name)
-                
+
         writer = self.create_writer(new_path)
         reader = self.create_reader(self.input_bag_path)
         if writer and reader:
@@ -535,7 +658,7 @@ class Application:
 
             self.write_images_to_bag(writer)
             self.write_other_topics_to_bag(reader, writer)
-            
+
             writer.close()
             reader.close()
             print(f'Bag file written to {writer.path}')
@@ -545,13 +668,13 @@ class Application:
     def increase_region_size(self):
         for ith in range(3):
             if self.cam[ith].mouse_in_window and self.cam[ith].last_region:
-                self.cam[ith].last_region.increase_size(0.05)    
+                self.cam[ith].last_region.increase_size(0.05)
                 self.render_window(ith)
-    
+
     def decrease_region_size(self):
         for ith in range(3):
             if self.cam[ith].mouse_in_window and self.cam[ith].last_region:
-                self.cam[ith].last_region.decrease_size(0.05)    
+                self.cam[ith].last_region.decrease_size(0.05)
                 self.render_window(ith)
 
     def confirm_and_increase_frame(self):
@@ -575,13 +698,13 @@ class Application:
                 # if self.cam[ith].last_region:
                 #     x -= self.cam[ith].last_region.width // 2
                 #     y -= self.cam[ith].last_region.height // 2
-                
+
                 for region in reversed(self.cam[ith].blur_regions[self.current_frame[ith]]):
                     if region.contains(x, y):
                         self.cam[ith].blur_regions[self.current_frame[ith]].remove(region)
                         self.render_window(ith)
                         break
-    
+
     def set_current_frame_as_ratio(self, ratio):
         for ith in range(3):
             self.current_frame[ith] = max(0, int(ratio * len(self.cam[ith].msg_list)) - 1)
@@ -597,6 +720,10 @@ class Application:
                 self.confirm_and_increase_frame()
             elif key == ord('x'):
                 self.erase_region_under_cursor()
+            elif key == ord('k'):
+                self.set_key_frame_start()
+            elif key == ord('l'):
+                self.set_key_frame_end()
             elif key == ord('d'):
                 self.increase_frame(1)
             elif key == ord('c'):
@@ -606,6 +733,7 @@ class Application:
             elif key == ord('e'):
                 self.write_regions_to_file(self.save_name)
                 self.export_data_to_bag()
+                self.write_regions_to_file(self.save_name)
             elif key == ord('w'):
                 self.write_regions_to_file(self.save_name)
             elif key == ord('r'):
@@ -661,7 +789,7 @@ class Application:
 
 
 if __name__ == '__main__':
-    
+
     if len(sys.argv) == 2:
         bag_file = Path(sys.argv[1])
     else:
@@ -671,3 +799,4 @@ if __name__ == '__main__':
 
     app = Application(bag_file)
     app.run()
+
