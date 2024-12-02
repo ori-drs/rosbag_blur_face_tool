@@ -383,6 +383,8 @@ class Application:
 
     def get_image_at_frame(self, ith, frame):
         camith_connection, camith_timestamp, camith_rawdata = self.cam[ith].msg_list[frame]
+        # print timestamp and ith
+        print(f'cam {ith} at timestamp {camith_timestamp}')
         camith_msg = self.typestore.deserialize_ros1(camith_rawdata, camith_connection.msgtype)
         return self.bridge.compressed_imgmsg_to_cv2(camith_msg, desired_encoding='passthrough')
 
