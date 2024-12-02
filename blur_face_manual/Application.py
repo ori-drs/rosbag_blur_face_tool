@@ -27,6 +27,9 @@ class Application:
         # get cams
         self.cams = self.BagFileHandler.get_cams()
 
+        # try to read regions from file
+        self.read_regions_from_file()
+
         self.threashold_distance = 30
         
         self.render_type = DisplayType.PREBLUR
