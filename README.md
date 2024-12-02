@@ -29,3 +29,9 @@
 - **X / Middle Click / Right Click**: Remove blur region.
 - **F / V**: Increase or decrease stamp size.
 - **B**: Toggle display between blurred region and blur border outline.
+- **K**: To turn the current region into the start key frame. Note: Only one blur track is supported at a time
+- **L**: To turn the current region into the end key frame. Note: Only one blur track is supported at a time
+
+The key frame region, if it exists, is persisted in the new frame. It can be dragged to better fit the
+blur in the new frame. Once dragged, the blur track in terminated, meaning that the blur region in all intermediate 
+frames between the start key frame and the dragged keyframe will be linearly interpolated.
