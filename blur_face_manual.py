@@ -34,10 +34,10 @@ class BlurRegion:
         pass
 
     def set_region(self, start_x, start_y, end_x, end_y):
-        self.start_x = start_x
-        self.start_y = start_y
-        self.end_x = end_x
-        self.end_y = end_y
+        self.start_x = min(start_x, end_x)
+        self.start_y = min(start_y, end_y)
+        self.end_x = max(start_x, end_x)
+        self.end_y = max(start_y, end_y)
 
         self.width = abs(self.end_x - self.start_x)
         self.height = abs(self.end_y - self.start_y)
