@@ -254,6 +254,9 @@ class Application:
         else:
             print('Quitting.')
             exit(1)
+
+        # try read save file at start
+        self.read_regions_from_file(self.save_name)
         
 
         self.other_topics_action = Action.FILTER
