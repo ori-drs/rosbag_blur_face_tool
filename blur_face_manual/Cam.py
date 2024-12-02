@@ -40,6 +40,12 @@ class Cam:
     def get_current_image(self):
         return self.get_image(self.current_frame)
 
+    def get_current_timestamp(self):
+        return self.get_timestamp(self.current_frame)
+    
+    def get_timestamp(self, frame):
+        return self.timestamp_list[frame]
+
     def get_image(self, frame):
         return self.bridge.compressed_imgmsg_to_cv2(self.compressed_imgmsg_list[frame], desired_encoding='passthrough')
 
