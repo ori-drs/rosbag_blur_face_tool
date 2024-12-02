@@ -7,24 +7,24 @@ from pathlib import Path
 
 class SaveFileHandler:
 
-    def __init__(self):
-        pass
+    def __init__(self, path):
+        self.path = path
 
-    def write_to_save_file(self, path, cams):
-        with open(path, 'w') as f:
+    def write_to_save_file(self, cams):
+        with open(self.path, 'w') as f:
             for ith, cam in enumerate(cams):
                 f.write(f'cam{ith} {len(cam.blur_regions)}\n')
                 f.write(str(cam))
-        print(f'blurred regions written to "./{path}".')
+        print(f'blurred regions written to "./{self.path}".')
     
-    def read_from_save_file(self, path):
-        if not Path(path).exists():
-            print(f'file "./{path}" does not exist.')
+    def read_from_save_file(self):
+        if not Path(self.path).exists():
+            print(f'file "./{self.path}" does not exist.')
             return None
 
         cams = []
 
-        with open(path, 'r') as f:
+        with open(self.path, 'r') as f:
             lines = f.readlines()
 
             current_cam = None
@@ -39,6 +39,6 @@ class SaveFileHandler:
                     blur_region = BlurRegion().from_str(region_str)
                     current_cam.blur_regions[int(index)].append(blur_region)
         
-        print(f'blurred regions read from "./{path}".')
+        print(f'blurred regions read from "./{self.path}".')
 
         return cams

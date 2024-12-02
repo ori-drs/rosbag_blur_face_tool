@@ -22,10 +22,10 @@ class Application:
 
         # helper objects
         self.BagFileHandler = BagFileHandler(input_bag_path)
-        self.cams = self.BagFileHandler.get_cams()
+        self.SaveFileHandler = SaveFileHandler(input_bag_path.stem + '_save.txt')
 
-        # save path
-        self.save_name = input_bag_path.stem + '_save.txt'
+        # get cams
+        self.cams = self.BagFileHandler.get_cams()
 
         self.threashold_distance = 30
         
@@ -168,15 +168,10 @@ class Application:
             live_region.draw_border_with_crosshair(window_content)
         
         # update window
-        cv2.imshow('cam'+str(ith), window_content)
+        cv2.imshow('cam'+str(ith), window_content)        
 
-    def write_regions_to_file(self, path):
-        save_file_handler = SaveFileHandler()
-        save_file_handler.write_to_save_file(path, self.cams)
-
-    def read_regions_from_file(self, path):
-        save_file_handler = SaveFileHandler()
-        loaded_cam = save_file_handler.read_from_save_file(path)
+    def read_regions_from_file(self):
+        loaded_cam = self.SaveFileHandler.read_from_save_file()
         if loaded_cam:    
             for ith in range(3):
                 self.cams[ith].blur_regions = loaded_cam[ith].blur_regions
@@ -243,12 +238,12 @@ class Application:
             elif key == ord('q'):
                 break
             elif key == ord('e'):
-                self.write_regions_to_file(self.save_name)
+                self.SaveFileHandler.write_to_save_file(self.cams)
                 self.BagFileHandler.export_cams(self.cams)
             elif key == ord('w'):
-                self.write_regions_to_file(self.save_name)
+                self.SaveFileHandler.write_to_save_file(self.cams)
             elif key == ord('r'):
-                self.read_regions_from_file(self.save_name)
+                self.read_regions_from_file()
                 self.render_windows()
             elif key == ord('b'):
                 if self.render_type == DisplayType.BLURRED:
