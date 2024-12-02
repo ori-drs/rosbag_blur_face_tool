@@ -238,9 +238,11 @@ class Application:
             elif key == ord('q'):
                 break
             elif key == ord('e'):
+                # write save then export
                 self.SaveFileHandler.write_to_save_file(self.cams)
                 self.BagFileHandler.export_cams(self.cams)
             elif key == ord('w'):
+                # write save
                 self.SaveFileHandler.write_to_save_file(self.cams)
             elif key == ord('r'):
                 self.read_regions_from_file()
