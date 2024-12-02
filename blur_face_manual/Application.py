@@ -24,11 +24,8 @@ class Application:
         self.BagFileHandler = BagFileHandler(input_bag_path)
         self.cams = self.BagFileHandler.get_cams()
 
-        # process path
-        self.input_bag_path = input_bag_path
-        self.bag_name = self.input_bag_path.stem
-        self.save_name = self.bag_name + '_save.txt'
-        self.output_bag_name = self.bag_name + '_blurred.bag'
+        # save path
+        self.save_name = input_bag_path.stem + '_save.txt'
 
         self.threashold_distance = 30
         
@@ -247,7 +244,7 @@ class Application:
                 break
             elif key == ord('e'):
                 self.write_regions_to_file(self.save_name)
-                self.BagFileHandler.export_data_to_bag(self.output_bag_name, self.cams)
+                self.BagFileHandler.export_cams(self.cams)
             elif key == ord('w'):
                 self.write_regions_to_file(self.save_name)
             elif key == ord('r'):

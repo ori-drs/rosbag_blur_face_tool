@@ -1,14 +1,7 @@
-# pathlib
-from pathlib import Path
-
 # numpy
 import numpy as np
 
-# enum
-from enum import Enum
-
-# cv2
-from cv_bridge import CvBridge
+# OpenCV
 import cv2
 
 # rosbags
@@ -19,56 +12,26 @@ from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage
 
 # blur_face_manual
 from blur_face_manual.Cam import Cam
-from blur_face_manual.BlurRegion import blur_image
-
-class Action(Enum):
-    PASSTHROUGH = 1
-    FILTER = 2
 
 class BagFileHandler:
     def __init__(self, path: str):
+        # input and output bag path
         self.input_bag_path = path
-        self.typestore = get_typestore(Stores.ROS1_NOETIC)
-        self.bridge = CvBridge()
-        
-        self.passthrough_topics = [
-            '/alphasense_driver_ros/imu',
-            '/hesai/pandar'
-        ]
+        self.output_bag_name = self.input_bag_path.stem + '_blurred.bag'
 
-        self.other_topics_action = Action.FILTER
-
-    def get_cams(self):
         # cam topics
-        cam0_topic = '/alphasense_driver_ros/cam0/debayered/image/compressed'
-        cam1_topic = '/alphasense_driver_ros/cam1/debayered/image/compressed'
-        cam2_topic = '/alphasense_driver_ros/cam2/debayered/image/compressed'
-        cam_topics = [cam0_topic, cam1_topic, cam2_topic]
+        self.cam_topics = [ '/alphasense_driver_ros/cam0/debayered/image/compressed', 
+                            '/alphasense_driver_ros/cam1/debayered/image/compressed',
+                            '/alphasense_driver_ros/cam2/debayered/image/compressed']
 
-        # read image from bag
-        reader = self.create_reader(self.input_bag_path)
-        if reader:
-            reader.open()
-            cams = self.read_images_from_bag(reader, cam_topics)
-            reader.close()
-        else:
-            print('Quitting.')
-            exit(1)
-        
-        return cams
-
-    def image_to_compressed_msg(self, image, header):
-        _, compressed_image = cv2.imencode('.jpg', image)
-        return CompressedImage(
-            header=header,
-            format='jpg',
-            data=np.frombuffer(compressed_image, dtype=np.uint8),
-        )
-    
+        # passthrough topics
+        self.passthrough_topics = [ '/alphasense_driver_ros/imu',
+                                    '/hesai/pandar']
 
     def create_reader(self, path):
+        typestore = get_typestore(Stores.ROS1_NOETIC)
         try:
-            reader = AnyReader([path], default_typestore=self.typestore)
+            reader = AnyReader([path], default_typestore = typestore)
             return reader
         except AnyReaderError as e:
             print(f'Cannot open bag file "{path}".')
@@ -89,102 +52,132 @@ class BagFileHandler:
         except Exception as e:
             print('An error occurred while opening the bag file.')
             return None
+        
+    # read bag and output cam object
+    def get_cams(self):
+        # typestore to deserialize messages
+        typestore = get_typestore(Stores.ROS1_NOETIC)
+        
+        # reader to read bag
+        reader = self.create_reader(self.input_bag_path)
 
-    def write_images_to_bag(self, writer, cams):
-        # for each camera
-        for ith, cam in enumerate(cams):
-            input_connection, _, _ = cam.msg_list[0]
-            output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)  
+        # error check
+        if reader is None:
+            exit()
 
-            # write for each frame
-            for frame in range(cam.total_frames):
-                print (f'Writing frame {frame} for cam {ith}')
-                input_connection, input_timestamp, input_rawdata = cam.msg_list[frame]
+        # open
+        reader.open()
 
-                # check if new blur regions are added
-                if cam.blur_regions[frame]:
-                    input_msg = self.typestore.deserialize_ros1(input_rawdata, input_connection.msgtype)
-                    input_image = self.bridge.compressed_imgmsg_to_cv2(input_msg, desired_encoding='passthrough')
+        # initialize cam
+        cams = [Cam() for _ in range(len(self.cam_topics))]
 
-                    output_image = input_image.copy()
-                    blur_image(output_image, cam.blur_regions[frame])
+        # for each connection
+        for connection in reader.connections:
+            if connection.topic in self.cam_topics:
+                # get ith
+                ith = self.cam_topics.index(connection.topic)
+                print(f'Reading messages for {connection.topic}')
 
-                    output_timestamp = input_timestamp
-                    output_msg = self.image_to_compressed_msg(output_image, input_msg.header)
-                    output_rawdata = self.typestore.serialize_ros1(output_msg, input_connection.msgtype)
-                    writer.write(output_connection, output_timestamp, output_rawdata)
+                # store other info
+                cams[ith].msg_list = list(reader.messages(connections=[connection]))
+                cams[ith].total_frames = len(list(reader.messages(connections=[connection])))
+                cams[ith].blur_regions = [[] for _ in range(cams[ith].total_frames)]
+                
+                # store compressed image messages
+                for connection, timestamp, rawdata in reader.messages(connections=[connection]):
+                    print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
+                    msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
+                    cams[ith].compressed_imgmsg_list.append(msg)
+                    cams[ith].timestamp_list.append(timestamp)
+
+            else:
+                continue
+
+        # close reader
+        reader.close()
+        
+        # return
+        return cams
+
+    # write both cam and other topics to bag
+    def export_cams(self, cams):
+        # reader and writer
+        reader = self.create_reader(self.input_bag_path)
+        writer = self.create_writer(self.output_bag_name)
+
+        # error check
+        if reader is None or writer is None:
+            return
+
+        # open
+        reader.open()
+        writer.open()
+        
+        # typestore
+        typestore = get_typestore(Stores.ROS1_NOETIC)
+
+        # create connections
+        reader_connections = []
+        output_connections = []
+        for connection in reader.connections:
+            # skip if not in recognized topics
+            if connection.topic not in self.passthrough_topics and connection.topic not in self.cam_topics:
+                continue
+            
+            # add connection
+            output_connection = writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=typestore)
+
+            # store connections
+            reader_connections.append(connection) # this is stored to provide indexing later
+            output_connections.append(output_connection)
+
+            # log
+            print(f'Added connection {connection.topic}')
+
+        # for each message
+        for connection, timestamp, rawdata in reader.messages():
+            # skip if not in recognized topics
+            if connection.topic not in self.passthrough_topics and connection.topic not in self.cam_topics:
+                continue
+            
+            # log
+            print(f'Writing message of timestamp {timestamp} for topic {connection.topic}')
+            
+            # find output connection
+            output_connection = output_connections[reader_connections.index(connection)]
+
+            # check if connection is in cam topics
+            if connection.topic in self.cam_topics:
+
+                # check if blur regions are added
+                ith = self.cam_topics.index(connection.topic)
+                frame = cams[ith].timestamp_list.index(timestamp)
+                if cams[ith].blur_regions[frame]:
+                    # create new rawdata
+                    new_image = cams[ith].get_image_with_blur(frame)
+                    new_msg = self.image_to_compressed_msg(new_image, cams[ith].compressed_imgmsg_list[frame].header)
+                    new_rawdata = typestore.serialize_ros1(new_msg, connection.msgtype)
+
+                    # use the new rawdata
+                    writer.write(output_connection, timestamp, new_rawdata)
                 else:
-                    writer.write(output_connection, input_timestamp, input_rawdata)
-
-    def write_other_topics_to_bag(self, reader, writer):
-        # process passthrough topics and other topics
-        for input_connection in reader.connections:
-            if input_connection.topic in self.passthrough_topics:
-                output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)
-                for input_connection, timestamp, rawdata in reader.messages(connections=[input_connection]):
-                    print(f'Writing message of timestamp {timestamp} for topic {input_connection.topic}')
+                    # use the same rawdata
                     writer.write(output_connection, timestamp, rawdata)
             else:
-                if self.other_topics_action == Action.PASSTHROUGH:
-                    output_connection = writer.add_connection(input_connection.topic, input_connection.msgtype, msgdef=input_connection.msgdef, typestore=self.typestore)
-                    for input_connection, timestamp, rawdata in reader.messages(connections=[input_connection]):
-                        print(f'Writing message of timestamp {timestamp} for topic {input_connection.topic}')
-                        writer.write(output_connection, timestamp, rawdata)
-                elif self.other_topics_action == Action.FILTER:
-                    pass
+                # write other topics using the same rawdata
+                writer.write(output_connection, timestamp, rawdata)
 
-    def export_data_to_bag(self, output_bag_name, cams):                
-        new_path = Path(output_bag_name)
+        # close
+        reader.close()
+        writer.close()
 
-        writer = self.create_writer(new_path)
-        reader = self.create_reader(self.input_bag_path)
-        if writer and reader:
-            writer.open()
-            reader.open()
+        # log
+        print(f'Bag file written to {writer.path}')
 
-            self.write_images_to_bag(writer, cams)
-            self.write_other_topics_to_bag(reader, writer)
-            
-            writer.close()
-            reader.close()
-            print(f'Bag file written to {writer.path}')
-        else:
-            return
-        
-
-    def process_passthrough_and_other_topics(self):
-        # process passthrough topics and other topics
-        for connection in self.reader.connections:
-
-            if connection.topic in self.cam_topics:
-                pass
-            elif connection.topic in self.passthrough_topics:
-                new_connection = self.writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=self.typestore)
-                for connection, timestamp, rawdata in self.reader.messages(connections=[connection]):
-                    self.writer.write(new_connection, timestamp, rawdata)
-            else:
-                if self.other_topics_action == Action.PASSTHROUGH:
-                    new_connection = self.writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=self.typestore)
-                    for connection, timestamp, rawdata in self.reader.messages(connections=[connection]):
-                        self.writer.write(new_connection, timestamp, rawdata)
-                elif self.other_topics_action == Action.FILTER:
-                    pass
-
-    def read_images_from_bag(self, reader, cam_topics):     
-        cams = [Cam() for _ in range(len(cam_topics))]
-        for ith, cam_topic in enumerate(cam_topics):
-            for connection in reader.connections:
-                if connection.topic == cam_topic:
-                    print(f'Reading messages for {cam_topic}')
-                    cams[ith].total_frames = len(list(reader.messages(connections=[connection])))
-                    cams[ith].blur_regions = [[] for _ in range(cams[ith].total_frames)]
-                    
-                    # read images
-                    for connection, timestamp, rawdata in reader.messages(connections=[connection]):
-                        print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
-                        msg = self.typestore.deserialize_ros1(rawdata, connection.msgtype)
-                        cams[ith].compressed_imgmsg_list.append(msg)
-
-                    cams[ith].msg_list = list(reader.messages(connections=[connection]))
-        
-        return cams
+    def image_to_compressed_msg(self, image, header):
+        _, compressed_image = cv2.imencode('.jpg', image)
+        return CompressedImage(
+            header=header,
+            format='jpg',
+            data=np.frombuffer(compressed_image, dtype=np.uint8),
+        )
