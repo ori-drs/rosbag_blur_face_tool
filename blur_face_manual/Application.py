@@ -37,13 +37,6 @@ class Application:
         # # process passthrough topics and other topics
         # self.process_passthrough_and_other_topics()
 
-        # process camera topics
-        self.create_window()
-        self.register_callbacks()
-
-        for ith in range(3):
-            self.render_window(ith)
-
     def process_image(self, input_image):
         return cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
 
@@ -226,7 +219,19 @@ class Application:
         for ith in range(3):
             self.cams[ith].current_frame = max(0, int(ratio * self.cams[ith].total_frames) - 1)
 
+    def export_to_bag(self):
+        self.BagFileHandler.export_cams(self.cams)
+
     def run(self):
+        # create windows
+        self.create_window()
+        self.register_callbacks()
+
+        # render windows
+        for ith in range(3):
+            self.render_window(ith)
+
+        # listen to key press
         while True:
             key = cv2.waitKey(1)
             if key == ord('z'):
@@ -246,7 +251,7 @@ class Application:
             elif key == ord('e'):
                 # write save then export
                 self.SaveFileHandler.write_to_save_file(self.cams)
-                self.BagFileHandler.export_cams(self.cams)
+                self.export_to_bag()
             elif key == ord('w'):
                 # write save
                 self.SaveFileHandler.write_to_save_file(self.cams)
@@ -298,6 +303,7 @@ class Application:
                 self.render_windows()
             else:
                 pass
-
+        
+        # close windows
         cv2.destroyAllWindows()
 
