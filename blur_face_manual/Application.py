@@ -21,7 +21,7 @@ class DisplayType(Enum):
 
 class Application:
 
-    def __init__(self, input_bag_path, save_file_folder = None, export_folder = None):
+    def __init__(self, input_bag_path, save_file_folder = "./", export_folder = "./"):
         # convert to path
         input_bag_path = Path(input_bag_path)
 
