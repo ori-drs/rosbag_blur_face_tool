@@ -14,7 +14,7 @@ from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage
 from blur_face_manual.Cam import Cam
 
 class BagFileHandler:
-    def __init__(self, path: str, export_folder: str):
+    def __init__(self, path, export_folder):
         # input and output bag path
         self.input_bag_path = path
         self.output_bag_name = export_folder + self.input_bag_path.stem + '_blurred.bag'

@@ -7,6 +7,9 @@ from enum import Enum
 # copy
 import copy
 
+# path
+from pathlib import Path
+
 # blur_face_manual
 from blur_face_manual.BlurRegion import BlurRegion, draw_crosshair, blur_image
 from blur_face_manual.SaveFileHandler import SaveFileHandler
@@ -19,6 +22,8 @@ class DisplayType(Enum):
 class Application:
 
     def __init__(self, input_bag_path, save_file_folder = None, export_folder = None):
+        # convert to path
+        input_bag_path = Path(input_bag_path)
 
         # helper objects
         self.BagFileHandler = BagFileHandler(input_bag_path, export_folder)
