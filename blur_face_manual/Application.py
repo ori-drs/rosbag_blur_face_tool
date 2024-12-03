@@ -179,6 +179,10 @@ class Application:
         if loaded_cam:    
             for ith in range(3):
                 self.cams[ith].blur_regions = loaded_cam[ith].blur_regions
+                if len(self.cams[ith].blur_regions) != self.cams[ith].total_frames:
+                    print("Error: loaded blur regions does not match total frames")
+                    print(f"current = {str(self.BagFileHandler.input_bag_path)}, current cam = {ith}")
+                    exit(1)
         
     def increase_region_size(self):
         for ith in range(3):
