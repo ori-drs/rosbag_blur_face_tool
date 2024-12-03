@@ -94,6 +94,10 @@ class BagFileHandler:
 
         # close reader
         reader.close()
+
+        # log
+        for i in range(len(cams)):
+            print(f'loaded {cams[i].total_frames} frames for {self.cam_topics[i]}')
         
         # return
         return cams
