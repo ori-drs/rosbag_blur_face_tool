@@ -7,7 +7,6 @@ from cv_bridge import CvBridge
 class Cam:
     def __init__(self):
         # data and blur regions
-        self.msg_list = []
         self.compressed_imgmsg_list = []
 
         self.bridge = CvBridge()

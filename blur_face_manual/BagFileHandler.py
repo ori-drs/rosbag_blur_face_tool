@@ -71,27 +71,26 @@ class BagFileHandler:
         # initialize cam
         cams = [Cam() for _ in range(len(self.cam_topics))]
 
-        # for each connection
-        for connection in reader.connections:
-            if connection.topic in self.cam_topics:
-                # get ith
-                ith = self.cam_topics.index(connection.topic)
-                print(f'Reading messages for {connection.topic}')
-
-                # store other info
-                cams[ith].msg_list = list(reader.messages(connections=[connection]))
-                cams[ith].total_frames = len(list(reader.messages(connections=[connection])))
-                cams[ith].blur_regions = [[] for _ in range(cams[ith].total_frames)]
-                
-                # store compressed image messages
-                for connection, timestamp, rawdata in reader.messages(connections=[connection]):
-                    print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
-                    msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
-                    cams[ith].compressed_imgmsg_list.append(msg)
-                    cams[ith].timestamp_list.append(timestamp)
-
-            else:
+        # for each image connection, store compressed image messages
+        for connection, timestamp, rawdata in reader.messages():
+            # skip if not cam topics
+            if connection.topic not in self.cam_topics:
                 continue
+
+            # log
+            print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
+
+            # get ith
+            ith = self.cam_topics.index(connection.topic)
+
+            # deserialize message
+            msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
+
+            # store data
+            cams[ith].compressed_imgmsg_list.append(msg)
+            cams[ith].timestamp_list.append(timestamp)
+            cams[ith].total_frames += 1
+            cams[ith].blur_regions.append([])
 
         # close reader
         reader.close()
