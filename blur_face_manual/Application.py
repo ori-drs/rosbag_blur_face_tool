@@ -18,11 +18,11 @@ class DisplayType(Enum):
 
 class Application:
 
-    def __init__(self, input_bag_path, export_path = None):
+    def __init__(self, input_bag_path, save_file_folder = None, export_folder = None):
 
         # helper objects
-        self.BagFileHandler = BagFileHandler(input_bag_path, export_path)
-        self.SaveFileHandler = SaveFileHandler(input_bag_path.stem + '_save.txt')
+        self.BagFileHandler = BagFileHandler(input_bag_path, export_folder)
+        self.SaveFileHandler = SaveFileHandler(save_file_folder + input_bag_path.stem + '_save.txt')
 
         # get cams
         self.cams = self.BagFileHandler.get_cams()
