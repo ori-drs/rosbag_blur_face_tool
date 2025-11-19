@@ -20,13 +20,11 @@ class BagFileHandler:
         self.output_bag_name = export_folder + self.input_bag_path.stem + '_blurred.bag'
 
         # cam topics
-        self.cam_topics = [ '/alphasense_driver_ros/cam0/debayered/image/compressed', 
-                            '/alphasense_driver_ros/cam1/debayered/image/compressed',
-                            '/alphasense_driver_ros/cam2/debayered/image/compressed']
+        self.cam_topics = [ '/cam0/image_raw', 
+                            '/cam1/image_raw']
 
         # passthrough topics
-        self.passthrough_topics = [ '/alphasense_driver_ros/imu',
-                                    '/hesai/pandar']
+        self.passthrough_topics = [ '/imu/data_raw']
 
     def create_reader(self, path):
         typestore = get_typestore(Stores.ROS1_NOETIC)
