@@ -41,7 +41,7 @@ This tool currently works for ROS1 bag files.
 
 ## Configuration and Usage
 
-First modify the `main.py` in this directory to have the correct list of `camera_topics` and `passthrough_topics`.
+First configure a `main.py` file - using the examples in this directory to have the correct list of `camera_topics` and `passthrough_topics`.
 
 Then you can run the module as follows - configured for your specific device:
 
