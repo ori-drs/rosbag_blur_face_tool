@@ -1,6 +1,8 @@
 
 # rosbag_blur_face_tool
 
+This tool currently works for ROS1 bag files
+
 ## Description
 - Opens bag files and displays three separate windows for cam0, cam1, and cam2.
 - Allows click-and-drag to create blur regions, which can be further stamped with left-click.
@@ -29,3 +31,14 @@
 - **X / Middle Click / Right Click**: Remove blur region.
 - **F / V**: Increase or decrease stamp size.
 - **B**: Toggle display between blurred region and blur border outline.
+
+## Configuration and Usage
+
+First modify the `main.py` in this directory to have the correct list of `camera_topics` and `passthrough_topics`.
+
+Then you can run the module as follows - configured for your specific device:
+
+```
+python main_frontier_v7.py /path-to-your/ros1bag.bag
+python main_insta360.py /path-to-your/ros1bag.bag
+````
