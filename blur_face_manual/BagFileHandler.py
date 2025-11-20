@@ -14,19 +14,16 @@ from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage
 from blur_face_manual.Cam import Cam
 
 class BagFileHandler:
-    def __init__(self, path, export_folder):
+    def __init__(self, path, export_folder, camera_topics, passthrough_topics):
         # input and output bag path
         self.input_bag_path = path
         self.output_bag_name = export_folder + self.input_bag_path.stem + '_blurred.bag'
 
         # cam topics
-        self.cam_topics = [ '/alphasense_driver_ros/cam0/debayered/image/compressed', 
-                            '/alphasense_driver_ros/cam1/debayered/image/compressed',
-                            '/alphasense_driver_ros/cam2/debayered/image/compressed']
+        self.camera_topics = camera_topics
 
         # passthrough topics
-        self.passthrough_topics = [ '/alphasense_driver_ros/imu',
-                                    '/hesai/pandar']
+        self.passthrough_topics = passthrough_topics
 
     def create_reader(self, path):
         typestore = get_typestore(Stores.ROS1_NOETIC)
@@ -69,19 +66,19 @@ class BagFileHandler:
         reader.open()
 
         # initialize cam
-        cams = [Cam() for _ in range(len(self.cam_topics))]
+        cams = [Cam() for _ in range(len(self.camera_topics))]
 
         # for each image connection, store compressed image messages
         for connection, timestamp, rawdata in reader.messages():
             # skip if not cam topics
-            if connection.topic not in self.cam_topics:
+            if connection.topic not in self.camera_topics:
                 continue
 
             # log
             print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
 
             # get ith
-            ith = self.cam_topics.index(connection.topic)
+            ith = self.camera_topics.index(connection.topic)
 
             # deserialize message
             msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
@@ -97,7 +94,7 @@ class BagFileHandler:
 
         # log
         for i in range(len(cams)):
-            print(f'loaded {cams[i].total_frames} frames for {self.cam_topics[i]}')
+            print(f'loaded {cams[i].total_frames} frames for {self.camera_topics[i]}')
         
         # return
         return cams
@@ -124,7 +121,7 @@ class BagFileHandler:
         output_connections = []
         for connection in reader.connections:
             # skip if not in recognized topics
-            if connection.topic not in self.passthrough_topics and connection.topic not in self.cam_topics:
+            if connection.topic not in self.passthrough_topics and connection.topic not in self.camera_topics:
                 continue
             
             # add connection
@@ -140,7 +137,7 @@ class BagFileHandler:
         # for each message
         for connection, timestamp, rawdata in reader.messages():
             # skip if not in recognized topics
-            if connection.topic not in self.passthrough_topics and connection.topic not in self.cam_topics:
+            if connection.topic not in self.passthrough_topics and connection.topic not in self.camera_topics:
                 continue
             
             # log
@@ -150,10 +147,10 @@ class BagFileHandler:
             output_connection = output_connections[reader_connections.index(connection)]
 
             # check if connection is in cam topics
-            if connection.topic in self.cam_topics:
+            if connection.topic in self.camera_topics:
 
                 # check if blur regions are added
-                ith = self.cam_topics.index(connection.topic)
+                ith = self.camera_topics.index(connection.topic)
                 frame = cams[ith].timestamp_list.index(timestamp)
                 if cams[ith].blur_regions[frame]:
                     # create new rawdata

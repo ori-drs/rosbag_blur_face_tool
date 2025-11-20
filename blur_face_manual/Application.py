@@ -21,16 +21,17 @@ class DisplayType(Enum):
 
 class Application:
 
-    def __init__(self, input_bag_path, save_file_folder = "./", export_folder = "./"):
+    def __init__(self, input_bag_path, save_file_folder = "./", export_folder = "./", camera_topics = None, passthrough_topics = None):
         # convert to path
         input_bag_path = Path(input_bag_path)
 
         # helper objects
-        self.BagFileHandler = BagFileHandler(input_bag_path, export_folder)
+        self.BagFileHandler = BagFileHandler(input_bag_path, export_folder, camera_topics, passthrough_topics)
         self.SaveFileHandler = SaveFileHandler(save_file_folder + input_bag_path.stem + '_save.txt')
 
         # get cams
         self.cams = self.BagFileHandler.get_cams()
+        self.num_cams = len(self.cams)
 
         # try to read regions from file
         self.read_regions_from_file()
@@ -56,7 +57,7 @@ class Application:
     # Mouse event callback function to update mouse position
     def mouse_callback(self, event, x, y, flags, ith):
         # remove cursor from other windows
-        for i in range(3):
+        for i in range( self.num_cams ):
             if self.cams[i].mouse_in_window:
                 self.cams[i].mouse_in_window = False
                 self.render_window(i)
@@ -107,37 +108,29 @@ class Application:
 
     def create_window(self):
         # display windows
-        cv2.namedWindow('cam0', cv2.WINDOW_NORMAL)
-        cv2.namedWindow('cam1', cv2.WINDOW_NORMAL)
-        cv2.namedWindow('cam2', cv2.WINDOW_NORMAL)
-
-        # resize windows
-        cv2.resizeWindow('cam0', 640, 480)
-        cv2.resizeWindow('cam1', 640, 480)
-        cv2.resizeWindow('cam2', 640, 480)
-
-        # move windows
-        cv2.moveWindow('cam0', 640, 0)
-        cv2.moveWindow('cam1', 0, 0)
-        cv2.moveWindow('cam2', 1280, 0)
+        for i in range(self.num_cams):
+            cam_name_short = "cam" + str(i)
+            cv2.namedWindow(cam_name_short, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(cam_name_short, 640, 480)
+            cv2.moveWindow(cam_name_short, 640*i, 0)
 
     def register_callbacks(self):
-        cv2.setMouseCallback('cam0', self.mouse_callback, param=0)
-        cv2.setMouseCallback('cam1', self.mouse_callback, param=1)
-        cv2.setMouseCallback('cam2', self.mouse_callback, param=2)
+        for i in range(self.num_cams):
+            cam_name_short = "cam" + str(i)
+            cv2.setMouseCallback(cam_name_short, self.mouse_callback, param=i)
 
     def increase_frame(self, num):
-        for ith in range(3):
+        for ith in range(self.num_cams):
             self.cams[ith].current_frame = min(self.cams[ith].total_frames - 1, self.cams[ith].current_frame + num)
         self.render_windows()
 
     def decrease_frame(self, num):
-        for ith in range(3):
+        for ith in range(self.num_cams):
             self.cams[ith].current_frame = max(0, self.cams[ith].current_frame - num)
         self.render_windows()
     
     def render_windows(self):
-        for ith in range(3):
+        for ith in range(self.num_cams):
             self.render_window(ith)
 
     def render_window(self, ith):
@@ -177,7 +170,7 @@ class Application:
     def read_regions_from_file(self):
         loaded_cam = self.SaveFileHandler.read_from_save_file()
         if loaded_cam:    
-            for ith in range(3):
+            for ith in range(self.num_cams):
                 self.cams[ith].blur_regions = loaded_cam[ith].blur_regions
                 if len(self.cams[ith].blur_regions) != self.cams[ith].total_frames:
                     print("Error: loaded blur regions does not match total frames")
@@ -185,20 +178,20 @@ class Application:
                     exit(1)
         
     def increase_region_size(self):
-        for ith in range(3):
+        for ith in range(self.num_cams):
             if self.cams[ith].mouse_in_window and self.cams[ith].last_region:
                 self.cams[ith].last_region.increase_size(0.05)    
                 self.render_window(ith)
     
     def decrease_region_size(self):
-        for ith in range(3):
+        for ith in range(self.num_cams):
             if self.cams[ith].mouse_in_window and self.cams[ith].last_region:
                 self.cams[ith].last_region.decrease_size(0.05)    
                 self.render_window(ith)
 
     def confirm_and_increase_frame(self):
         added_region = False
-        for ith in range(3):
+        for ith in range(self.num_cams):
             if self.cams[ith].mouse_in_window and self.cams[ith].last_region:
                 blur_region = copy.deepcopy(self.cams[ith].last_region)
                 blur_region.set_bottom_right_corner(self.cams[ith].mouse_x, self.cams[ith].mouse_y)
@@ -208,7 +201,7 @@ class Application:
             self.increase_frame(1)
 
     def erase_region_under_cursor(self):
-        for ith in range(3):
+        for ith in range(self.num_cams):
             if self.cams[ith].mouse_in_window:
                 x = self.cams[ith].mouse_x
                 y = self.cams[ith].mouse_y
@@ -225,7 +218,7 @@ class Application:
                         break
     
     def set_current_frame_as_ratio(self, ratio):
-        for ith in range(3):
+        for ith in range(self.num_cams):
             self.cams[ith].current_frame = max(0, int(ratio * self.cams[ith].total_frames) - 1)
 
     def export_to_bag(self):
@@ -237,7 +230,7 @@ class Application:
         self.register_callbacks()
 
         # render windows
-        for ith in range(3):
+        for ith in range(self.num_cams):
             self.render_window(ith)
 
         # listen to key press
