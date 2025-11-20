@@ -1,7 +1,14 @@
 
 # rosbag_blur_face_tool
 
-This tool currently works for ROS1 bag files
+Tool to manually blur faces in rosbag images. The user draws an ellipse on each image and can use shortcuts to move forward and back in the rosbag. We used it to carry out privacy blurring of the [Oxford Spires Dataset](https://dynamic.robots.ox.ac.uk/datasets/).
+
+The input is a rosbag. The output is a rosbag with the blurred images. The ellipses ("blur regions") can be written to a text file to allow the blurring to be refined later, if needed.
+
+This tool currently works for ROS1 bag files.
+
+<img src="images/ui.png" alt="vilens_logo" width="80%"/>
+
 
 ## Description
 - Opens bag files and displays three separate windows for cam0, cam1, and cam2.
@@ -42,3 +49,7 @@ Then you can run the module as follows - configured for your specific device:
 python main_frontier_v7.py /path-to-your/ros1bag.bag
 python main_insta360.py /path-to-your/ros1bag.bag
 ````
+
+## Author 
+
+Jiahao Wang, Oxford Robotics Institute
