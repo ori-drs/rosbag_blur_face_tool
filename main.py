@@ -22,7 +22,7 @@ if __name__ == '__main__':
     ros_version = 2 # 1 for ROS1, 2 for ROS2
     
     if len(sys.argv) == 1:
-        bag_file = Path('/home/jiahao/Downloads/1710755621-2024-03-18-10-02-36-1.bag')
+        bag_file = Path('<path_to_bag_file>')
         save_file_folder = ""
         export_folder = ""
         print("Usage: python blur_face_manual.py <path_to_bag_file>")
