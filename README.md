@@ -1,4 +1,3 @@
-
 # rosbag_blur_face_tool
 
 Tool to manually blur faces in rosbag images. The user draws an ellipse on each image and can use shortcuts to move forward and back in the rosbag. We used it to carry out privacy blurring of the [Oxford Spires Dataset](https://dynamic.robots.ox.ac.uk/datasets/).
@@ -72,3 +71,6 @@ Be aware to set the export path to an attached volume so that the output is save
 ## Author 
 
 Jiahao Wang, Oxford Robotics Institute
+
+## License
+This work is licensed under a [BSD 3-Clause License](https://opensource.org/license/BSD-3-Clause).
