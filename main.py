@@ -14,8 +14,8 @@ if __name__ == '__main__':
     #                         '/hesai/pandar']
 
     ####### topics - insta360
-    camera_topics = [ '/cam0/image_raw', 
-                      '/cam1/image_raw']
+    camera_topics = [ '/cam0/image_raw/compressed', 
+                      '/cam1/image_raw/compressed']
     passthrough_topics = [ '/imu/data_raw']
 
     
