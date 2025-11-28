@@ -28,6 +28,10 @@ python main.py /path-to-your/ros2bag
 python main.py /path-to-your/ros1bag.bag
 ```
 
+## Docker
+```bash
+docker compose -f .docker/docker-compose.yml run --build blur_face
+```
 
 ## Description
 - Opens bag files and displays three separate windows for cam0, cam1, and cam2.
