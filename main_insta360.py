@@ -6,8 +6,14 @@ import sys
 from blur_face_manual.Application import Application
 
 if __name__ == '__main__':
+    ####### topics - frontier v7
+    # camera_topics = [ '/alphasense_driver_ros/cam0/debayered/image/compressed', 
+    #                 '/alphasense_driver_ros/cam1/debayered/image/compressed',
+    #                 '/alphasense_driver_ros/cam2/debayered/image/compressed']
+    # passthrough_topics = [ '/alphasense_driver_ros/imu',
+    #                         '/hesai/pandar']
 
-    # topics - insta360
+    ####### topics - insta360
     camera_topics = [ '/cam0/image_raw', 
                       '/cam1/image_raw']
     passthrough_topics = [ '/imu/data_raw']
