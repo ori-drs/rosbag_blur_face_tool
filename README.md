@@ -22,10 +22,10 @@ Then you can run the module as follows - configured for your specific device:
 
 ```bash
 # ros2
-python main_insta360.py /path-to-your/ros2bag
+python main.py /path-to-your/ros2bag
 
 # ros1
-python main_insta360.py /path-to-your/ros1bag.bag
+python main.py /path-to-your/ros1bag.bag
 ```
 
 
