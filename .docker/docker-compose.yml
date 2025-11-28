@@ -18,7 +18,6 @@ services:
     runtime: nvidia
     tty: true
     volumes:
-      - ${HOST_DATA_DIR}:${DOCKER_DATA_DIR}
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /home/yifu/workspace/rosbag_blur_face_tool/:/home/yifu/workspace/rosbag_blur_face_tool/
-      - /home/yifu/projects/hilti-slam-2026/floor_1/2025-05-05/:/home/yifu/hilti_floor_1/
+      - ${HOST_DATA_DIR}:${DOCKER_DATA_DIR}
+      # - <ros2bag-path>:<ros2bag-path-in-container> # Mount host data to container if needed 
