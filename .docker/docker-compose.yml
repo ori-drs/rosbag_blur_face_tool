@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  docker_ros2:
+    build:
+      context: ../
+      dockerfile: .docker/Dockerfile
+      target: deploy
+      args:
+        - USERNAME=${USERNAME}
+        - UID=${UID}
+        - GID=${GID}
+        - DOCKER_HOME_DIR=${DOCKER_HOME_DIR}
+        - DOCKER_WORKDIR=${DOCKER_WORKDIR}
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+    runtime: nvidia
+    tty: true
+    volumes:
+      - ${HOST_DATA_DIR}:${DOCKER_DATA_DIR}
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /home/yifu/workspace/rosbag_blur_face_tool/:/home/yifu/workspace/rosbag_blur_face_tool/
+      - /home/yifu/projects/hilti-slam-2026/floor_1/2025-05-05/:/home/yifu/hilti_floor_1/
