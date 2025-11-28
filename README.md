@@ -5,9 +5,28 @@ Tool to manually blur faces in rosbag images. The user draws an ellipse on each 
 
 The input is a rosbag. The output is a rosbag with the blurred images. The ellipses ("blur regions") can be written to a text file to allow the blurring to be refined later, if needed.
 
-This tool currently works for ROS1 bag files.
+This tool currently works for ROS1/2 bag files.
 
 <img src="images/ui.png" alt="vilens_logo" width="80%"/>
+
+## Installation
+```bash
+pip install -r requirements.txt
+```
+
+## Configuration and Usage
+
+First configure a `main.py` file - using the examples in this directory to have the correct list of `camera_topics` and `passthrough_topics`.
+
+Then you can run the module as follows - configured for your specific device:
+
+```bash
+# ros2
+python main_insta360.py /path-to-your/ros2bag
+
+# ros1
+python main_insta360.py /path-to-your/ros1bag.bag
+```
 
 
 ## Description
@@ -39,16 +58,6 @@ This tool currently works for ROS1 bag files.
 - **F / V**: Increase or decrease stamp size.
 - **B**: Toggle display between blurred region and blur border outline.
 
-## Configuration and Usage
-
-First configure a `main.py` file - using the examples in this directory to have the correct list of `camera_topics` and `passthrough_topics`.
-
-Then you can run the module as follows - configured for your specific device:
-
-```
-python main_frontier_v7.py /path-to-your/ros1bag.bag
-python main_insta360.py /path-to-your/ros1bag.bag
-````
 
 ## Author 
 
