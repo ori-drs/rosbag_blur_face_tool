@@ -37,6 +37,9 @@ RUN addgroup --gid $GID $USERNAME
 RUN adduser --disabled-password --gecos '' --uid $UID --gid $GID $USERNAME
 
 WORKDIR ${DOCKER_WORKDIR}
+COPY ./requirements.txt ${DOCKER_WORKDIR}/requirements.txt
+COPY ./blur_face_manual ${DOCKER_WORKDIR}/blur_face_manual
+COPY ./main.py ${DOCKER_WORKDIR}/main.py
 RUN chown -R ${UID}:${GID} ${DOCKER_HOME_DIR}
 USER ${USERNAME}
 
