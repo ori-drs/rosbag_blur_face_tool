@@ -32,6 +32,12 @@ python main.py /path-to-your/ros1bag.bag
 ```bash
 docker compose -f .docker/docker-compose.yml run --build blur_face
 ```
+In side the docker, install the dependencies, then run the main script
+```bash
+pip install -r requirements.txt
+python main.py <path_to_bag_file_or_folder> <save_path_prefix> <export_path>
+```
+Be aware to set the export path to an attached volume so that the output is saved in the host computer. If not set, the output will be saved in the docker workspace and not in the host computer.
 
 ## Description
 - Opens bag files and displays three separate windows for cam0, cam1, and cam2.
