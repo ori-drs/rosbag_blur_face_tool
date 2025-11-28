@@ -13,7 +13,8 @@ from pathlib import Path
 # blur_face_manual
 from blur_face_manual.BlurRegion import BlurRegion, draw_crosshair, blur_image
 from blur_face_manual.SaveFileHandler import SaveFileHandler
-from blur_face_manual.BagFileHandler import BagFileHandler
+from blur_face_manual.BagFileHandler import BagFileHandler_ros1
+from blur_face_manual.BagFileHnadler_ros2 import BagFileHandler_ros2
 
 class DisplayType(Enum):
     PREBLUR = 1
@@ -21,12 +22,18 @@ class DisplayType(Enum):
 
 class Application:
 
-    def __init__(self, input_bag_path, save_file_folder = "./", export_folder = "./", camera_topics = None, passthrough_topics = None):
+    def __init__(self, input_bag_path, save_file_folder = "./", export_folder = "./", camera_topics = None, passthrough_topics = None, ros_version = 2):
         # convert to path
         input_bag_path = Path(input_bag_path)
 
         # helper objects
-        self.BagFileHandler = BagFileHandler(input_bag_path, export_folder, camera_topics, passthrough_topics)
+        if ros_version == 1:
+            self.BagFileHandler = BagFileHandler_ros1(input_bag_path, export_folder, camera_topics, passthrough_topics)
+        elif ros_version == 2:
+            self.BagFileHandler = BagFileHandler_ros2(input_bag_path, export_folder, camera_topics, passthrough_topics)
+        else:
+            print("Error: ros_version must be 1 or 2")
+            exit(1)
         self.SaveFileHandler = SaveFileHandler(save_file_folder + input_bag_path.stem + '_save.txt')
 
         # get cams
