@@ -5,10 +5,39 @@ Tool to manually blur faces in rosbag images. The user draws an ellipse on each 
 
 The input is a rosbag. The output is a rosbag with the blurred images. The ellipses ("blur regions") can be written to a text file to allow the blurring to be refined later, if needed.
 
-This tool currently works for ROS1 bag files.
+This tool currently works for ROS1/2 bag files.
 
 <img src="images/ui.png" alt="vilens_logo" width="80%"/>
 
+## Installation
+```bash
+pip install -r requirements.txt
+```
+
+## Configuration and Usage
+
+First configure a `main.py` file - using the examples in this directory to have the correct list of `camera_topics` and `passthrough_topics`.
+
+Then you can run the module as follows - configured for your specific device:
+
+```bash
+# ros2
+python main.py /path-to-your/ros2bag
+
+# ros1
+python main.py /path-to-your/ros1bag.bag
+```
+
+## Docker
+```bash
+docker compose -f .docker/docker-compose.yml run --build blur_face
+```
+In side the docker, install the dependencies, then run the main script
+```bash
+pip install -r requirements.txt
+python main.py <path_to_bag_file_or_folder> <save_path_prefix> <export_path>
+```
+Be aware to set the export path to an attached volume so that the output is saved in the host computer. If not set, the output will be saved in the docker workspace and not in the host computer.
 
 ## Description
 - Opens bag files and displays three separate windows for cam0, cam1, and cam2.
@@ -39,16 +68,6 @@ This tool currently works for ROS1 bag files.
 - **F / V**: Increase or decrease stamp size.
 - **B**: Toggle display between blurred region and blur border outline.
 
-## Configuration and Usage
-
-First configure a `main.py` file - using the examples in this directory to have the correct list of `camera_topics` and `passthrough_topics`.
-
-Then you can run the module as follows - configured for your specific device:
-
-```
-python main_frontier_v7.py /path-to-your/ros1bag.bag
-python main_insta360.py /path-to-your/ros1bag.bag
-````
 
 ## Author 
 

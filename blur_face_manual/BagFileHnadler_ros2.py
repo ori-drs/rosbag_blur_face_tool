@@ -7,17 +7,25 @@ import cv2
 # rosbags
 from rosbags.typesys import get_typestore, Stores
 from rosbags.highlevel import AnyReader, AnyReaderError
-from rosbags.rosbag1 import Writer, WriterError
-from rosbags.typesys.stores.ros1_noetic import sensor_msgs__msg__CompressedImage as CompressedImage
+from rosbags.rosbag2 import Writer, WriterError
+import os
+ros_distro = os.environ.get('ROS_DISTRO')
+print (f'ROS_DISTRO: {ros_distro}')
+if ros_distro == 'humble':
+    from rosbags.typesys.stores.ros2_humble import sensor_msgs__msg__CompressedImage as CompressedImage
+elif ros_distro == 'jazzy':
+    from rosbags.typesys.stores.ros2_jazzy import sensor_msgs__msg__CompressedImage as CompressedImage
+else:
+    raise Exception(f'Unsupported ROS2 distro: {ros_distro}')
 
 # blur_face_manual
 from blur_face_manual.Cam import Cam
 
-class BagFileHandler_ros1:
+class BagFileHandler_ros2:
     def __init__(self, path, export_folder, camera_topics, passthrough_topics):
         # input and output bag path
         self.input_bag_path = path
-        self.output_bag_name = export_folder + self.input_bag_path.stem + '_blurred.bag'
+        self.output_bag_name = export_folder + self.input_bag_path.stem + '_blurred'
 
         # cam topics
         self.camera_topics = camera_topics
@@ -26,7 +34,7 @@ class BagFileHandler_ros1:
         self.passthrough_topics = passthrough_topics
 
     def create_reader(self, path):
-        typestore = get_typestore(Stores.ROS1_NOETIC)
+        typestore = get_typestore(Stores.ROS2_HUMBLE)
         try:
             reader = AnyReader([path], default_typestore = typestore)
             return reader
@@ -53,7 +61,7 @@ class BagFileHandler_ros1:
     # read bag and output cam object
     def get_cams(self):
         # typestore to deserialize messages
-        typestore = get_typestore(Stores.ROS1_NOETIC)
+        typestore = get_typestore(Stores.ROS2_HUMBLE)
         
         # reader to read bag
         reader = self.create_reader(self.input_bag_path)
@@ -81,7 +89,7 @@ class BagFileHandler_ros1:
             ith = self.camera_topics.index(connection.topic)
 
             # deserialize message
-            msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
+            msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
 
             # store data
             cams[ith].compressed_imgmsg_list.append(msg)
@@ -114,7 +122,7 @@ class BagFileHandler_ros1:
         writer.open()
         
         # typestore
-        typestore = get_typestore(Stores.ROS1_NOETIC)
+        typestore = get_typestore(Stores.ROS2_HUMBLE)
 
         # create connections
         reader_connections = []
@@ -125,7 +133,7 @@ class BagFileHandler_ros1:
                 continue
             
             # add connection
-            output_connection = writer.add_connection(connection.topic, connection.msgtype, msgdef=connection.msgdef, typestore=typestore)
+            output_connection = writer.add_connection(connection.topic, connection.msgtype, typestore=typestore)
 
             # store connections
             reader_connections.append(connection) # this is stored to provide indexing later
@@ -156,7 +164,7 @@ class BagFileHandler_ros1:
                     # create new rawdata
                     new_image = cams[ith].get_image_with_blur(frame)
                     new_msg = self.image_to_compressed_msg(new_image, cams[ith].compressed_imgmsg_list[frame].header)
-                    new_rawdata = typestore.serialize_ros1(new_msg, connection.msgtype)
+                    new_rawdata = typestore.serialize_cdr(new_msg, connection.msgtype)
 
                     # use the new rawdata
                     writer.write(output_connection, timestamp, new_rawdata)
@@ -178,6 +186,6 @@ class BagFileHandler_ros1:
         _, compressed_image = cv2.imencode('.jpg', image)
         return CompressedImage(
             header=header,
-            format='jpg',
+            format='jpeg',
             data=np.frombuffer(compressed_image, dtype=np.uint8),
         )
