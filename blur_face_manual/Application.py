@@ -145,7 +145,7 @@ class Application:
         window_content = self.cams[ith].get_current_image()
 
         # print timestamp
-        print(f"cam{ith} {self.cams[ith].get_current_timestamp()}")
+        # print(f"cam{ith} {self.cams[ith].get_current_timestamp()}")
 
         # draw blur regions border or blur regions
         if self.render_type == DisplayType.PREBLUR:

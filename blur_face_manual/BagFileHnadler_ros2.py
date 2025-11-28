@@ -75,7 +75,7 @@ class BagFileHandler_ros2:
                 continue
 
             # log
-            print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
+            # print(f'Reading message of timestamp {timestamp} for topic {connection.topic}')
 
             # get ith
             ith = self.camera_topics.index(connection.topic)
