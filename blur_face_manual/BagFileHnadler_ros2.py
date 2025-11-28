@@ -8,7 +8,15 @@ import cv2
 from rosbags.typesys import get_typestore, Stores
 from rosbags.highlevel import AnyReader, AnyReaderError
 from rosbags.rosbag2 import Writer, WriterError
-from rosbags.typesys.stores.ros2_humble import sensor_msgs__msg__CompressedImage as CompressedImage
+import os
+ros_distro = os.environ.get('ROS_DISTRO')
+print (f'ROS_DISTRO: {ros_distro}')
+if ros_distro == 'humble':
+    from rosbags.typesys.stores.ros2_humble import sensor_msgs__msg__CompressedImage as CompressedImage
+elif ros_distro == 'jazzy':
+    from rosbags.typesys.stores.ros2_jazzy import sensor_msgs__msg__CompressedImage as CompressedImage
+else:
+    raise Exception(f'Unsupported ROS2 distro: {ros_distro}')
 
 # blur_face_manual
 from blur_face_manual.Cam import Cam
