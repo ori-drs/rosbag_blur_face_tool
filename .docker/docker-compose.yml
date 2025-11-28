@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-  docker_ros2:
+  blur_face:
     build:
       context: ../
       dockerfile: .docker/Dockerfile
