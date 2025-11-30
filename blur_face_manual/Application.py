@@ -14,7 +14,7 @@ from pathlib import Path
 from blur_face_manual.BlurRegion import BlurRegion, draw_crosshair, blur_image
 from blur_face_manual.SaveFileHandler import SaveFileHandler
 from blur_face_manual.BagFileHandler import BagFileHandler_ros1
-from blur_face_manual.BagFileHnadler_ros2 import BagFileHandler_ros2
+from blur_face_manual.BagFileHandler_ros2 import BagFileHandler_ros2
 
 class DisplayType(Enum):
     PREBLUR = 1
