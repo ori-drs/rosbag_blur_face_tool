@@ -237,7 +237,7 @@ class BagFileHandler_ros2:
         for topic in topics_to_write:
             typ = topic_type_map.get(topic, 'sensor_msgs/msg/CompressedImage')
             # set id to 0 (rosbag2_py will manage internal ids)
-            metadata = TopicMetadata(0, topic, typ, 'cdr')
+            metadata = TopicMetadata(topic, typ, 'cdr') if ros_distro == "humble" else TopicMetadata(0, topic, typ, 'cdr')
             writer.create_topic(metadata)
             print(f'Added connection {topic} ({typ})')
 
