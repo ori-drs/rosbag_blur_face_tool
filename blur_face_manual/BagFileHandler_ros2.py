@@ -18,6 +18,7 @@ from sensor_msgs.msg import CompressedImage
 from blur_face_manual.Cam import Cam
 
 ros_distro = os.environ.get('ROS_DISTRO')
+assert ros_distro in ['humble', "jazzy"], f'Unsupported ROS_DISTRO: {ros_distro}'
 print(f'ROS_DISTRO: {ros_distro}')
 
 
