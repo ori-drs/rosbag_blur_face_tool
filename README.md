@@ -21,10 +21,10 @@ Then you can run the module as follows - configured for your specific device:
 
 ```bash
 # ros2
-python main.py /path-to-your/ros2bag
+python main.py <path-to-ros2bag.db3>
 
 # ros1
-python main.py /path-to-your/ros1bag.bag
+python main.py <path-to-ros1bag.bag>
 ```
 
 ## Docker
